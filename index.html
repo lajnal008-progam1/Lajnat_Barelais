@@ -1,0 +1,4078 @@
+<!DOCTYPE html>
+<!--
+  ╔════════════════════════════════════════════════════════════╗
+  ║  سجل تبرعات اللجنة - تطبيق مباشر متعدد المستخدمين            ║
+  ╠════════════════════════════════════════════════════════════╣
+  ║  الإعداد:                                                    ║
+  ║  1) أنشئ مشروع Firebase جديد على console.firebase.google.com ║
+  ║  2) فعّل Firestore Database                                  ║
+  ║  3) انسخ إعدادات الويب في القسم firebaseConfig أسفله         ║
+  ║  4) ارفع الملف على GitHub Pages أو أي استضافة                ║
+  ║                                                              ║
+  ║  المستخدمون الافتراضيون: admin/1234, lajna1/1111 ...         ║
+  ╚════════════════════════════════════════════════════════════╝
+-->
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2c5364">
+<title>سجل تبرعات اللجنة</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Segoe UI', Tahoma, system-ui, -apple-system, sans-serif;
+  background: #f5f6f8;
+  color: #222;
+  min-height: 100vh;
+  -webkit-tap-highlight-color: transparent;
+  font-size: 15px;
+}
+.hidden { display: none !important; }
+
+/* ===== Login ===== */
+#login {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+  padding: 20px;
+}
+.login-box {
+  background: white;
+  border-radius: 16px;
+  padding: 30px 24px;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+}
+.login-box h1 {
+  text-align: center;
+  color: #2c5364;
+  margin-bottom: 8px;
+  font-size: 22px;
+}
+.login-box p {
+  text-align: center;
+  color: #777;
+  margin-bottom: 22px;
+  font-size: 13px;
+}
+.login-box input {
+  width: 100%;
+  padding: 13px 16px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  font-size: 16px;
+  outline: none;
+  font-family: inherit;
+}
+.login-box input:focus { border-color: #2c5364; }
+.login-box button {
+  width: 100%;
+  padding: 14px;
+  background: #2c5364;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 6px;
+}
+
+/* ===== App ===== */
+#app { padding-bottom: 76px; }
+header {
+  background: linear-gradient(135deg, #2c5364 0%, #1a3744 100%);
+  color: white;
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+}
+header h1 { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
+header .user-info { font-size: 12px; opacity: 0.95; display: flex; gap: 8px; align-items: center; }
+header button {
+  background: rgba(255,255,255,0.22);
+  border: none;
+  color: white;
+  padding: 6px 11px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-family: inherit;
+}
+header button:hover { background: rgba(255,255,255,0.35); }
+
+/* ===== Stats bar ===== */
+.statbar {
+  background: white;
+  padding: 12px 8px;
+  display: flex;
+  justify-content: space-around;
+  gap: 4px;
+  border-bottom: 1px solid #e8e8e8;
+  position: sticky;
+  top: 49px;
+  z-index: 90;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+}
+.stat { text-align: center; flex: 1; }
+.stat .num {
+  display: block;
+  font-size: 18px;
+  font-weight: 800;
+  color: #2c5364;
+  letter-spacing: -0.3px;
+  transition: color 0.2s, transform 0.2s;
+}
+.stat .lbl {
+  font-size: 10.5px;
+  color: #6b7280;
+  margin-top: 2px;
+  font-weight: 500;
+}
+
+/* ===== Bottom nav ===== */
+nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: white;
+  display: flex;
+  border-top: 1px solid #e8e8e8;
+  z-index: 100;
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+}
+nav button {
+  flex: 1;
+  padding: 10px 2px;
+  border: none;
+  background: none;
+  font-size: 10px;
+  color: #888;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-family: inherit;
+}
+nav button.active { color: #2c5364; }
+nav button .icon { font-size: 18px; }
+
+/* ===== Sections ===== */
+section { padding: 14px; display: none; }
+section.active { display: block; }
+section > h2 {
+  font-size: 15px;
+  color: #2c5364;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+/* ===== Form ===== */
+.form-card {
+  background: white;
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+.form-row { margin-bottom: 12px; }
+.form-row label {
+  display: block;
+  font-size: 13px;
+  color: #555;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+.form-row input, .form-row select, .form-row textarea {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  font-size: 15px;
+  outline: none;
+  font-family: inherit;
+  background: #fafafa;
+}
+.form-row input:focus, .form-row select:focus, .form-row textarea:focus {
+  border-color: #2c5364;
+  background: white;
+}
+.toggle-row { display: flex; gap: 6px; }
+.toggle-btn {
+  flex: 1;
+  padding: 10px;
+  border: 1.5px solid #ddd;
+  background: white;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  color: #555;
+}
+.toggle-btn.active {
+  background: #2c5364;
+  color: white;
+  border-color: #2c5364;
+}
+.btn-submit {
+  width: 100%;
+  padding: 14px;
+  background: #2c5364;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 6px;
+  font-family: inherit;
+}
+.btn-submit:disabled { opacity: 0.6; }
+.btn-submit.success { background: #16a34a; }
+
+/* ===== Feed summary + patients mini ===== */
+.feed-summary {
+  background: linear-gradient(135deg, #eef4f7, #f8fafc);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  border: 1px solid #e5e7eb;
+}
+@media (min-width: 500px) {
+  .feed-summary { grid-template-columns: repeat(4, 1fr); }
+}
+.feed-stat {
+  text-align: center;
+  padding: 4px 6px;
+}
+.feed-stat .v {
+  font-size: 18px;
+  font-weight: 800;
+  color: #2c5364;
+  letter-spacing: -0.3px;
+  line-height: 1.1;
+  display: block;
+}
+.feed-stat .l {
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 3px;
+  font-weight: 500;
+}
+.feed-stat.gold .v { color: #d97706; }
+.feed-stat.green .v { color: #16a34a; }
+.feed-stat.blue .v { color: #2563eb; }
+
+/* Patients mini grid in feed */
+.patients-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 7px;
+  margin-bottom: 14px;
+}
+@media (min-width: 500px) { .patients-mini-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 700px) { .patients-mini-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 1000px) { .patients-mini-grid { grid-template-columns: repeat(5, 1fr); } }
+
+.pm-card {
+  background: white;
+  border-radius: 10px;
+  padding: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  border-right: 3px solid #2c5364;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.2s;
+}
+.pm-card:active { transform: scale(0.97); }
+.pm-card.completed {
+  border-right-color: #16a34a;
+  background: linear-gradient(180deg, #f0fdf4 0%, white 50%);
+}
+.pm-card.target-reached {
+  background: linear-gradient(135deg, #fef3c7, white 70%);
+  border-right-color: #f59e0b;
+}
+.pm-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.pm-num {
+  background: #2c5364;
+  color: white;
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+.pm-name {
+  font-weight: bold;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #1f2937;
+  flex: 1;
+  min-width: 0;
+}
+.pm-amount {
+  color: #16a34a;
+  font-weight: 800;
+  font-size: 15px;
+  margin: 4px 0 2px;
+  letter-spacing: -0.3px;
+}
+.pm-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #6b7280;
+  margin-top: 4px;
+}
+.pm-progress-bar {
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 5px;
+}
+.pm-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2c5364, #4ade80);
+  transition: width 0.3s;
+}
+.pm-progress-fill.full {
+  background: linear-gradient(90deg, #16a34a, #22c55e);
+}
+
+/* Feed section header */
+.feed-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 16px 0 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.feed-section-head.admin-section {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+.feed-section-head.normal-section {
+  background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
+  color: #3730a3;
+  border: 1px solid #a5b4fc;
+}
+.feed-section-head .count {
+  background: white;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* ===== Donation card ===== */
+.donations-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+@media (min-width: 600px) {
+  .donations-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (min-width: 900px) {
+  .donations-grid { grid-template-columns: repeat(4, 1fr); }
+}
+@media (min-width: 1200px) {
+  .donations-grid { grid-template-columns: repeat(5, 1fr); }
+}
+
+.dg-card {
+  background: white;
+  border-radius: 14px;
+  padding: 12px 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  border-right: 4px solid #ccc;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+  min-height: 200px;
+}
+.dg-card:active { transform: scale(0.98); }
+.dg-card.confirmed { border-right-color: #16a34a; }
+.dg-card.pending {
+  border-right-color: #eab308;
+  background: linear-gradient(135deg, #fffceb 0%, white 50%);
+}
+.dg-card.cancelled {
+  border-right-color: #dc2626;
+  opacity: 0.55;
+}
+.dg-card.admin-confirmed {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 30%, white 100%);
+  border-right: 5px solid #f59e0b;
+  box-shadow: 0 0 0 1.5px #fde68a, 0 4px 14px rgba(245, 158, 11, 0.22);
+}
+.dg-admin-badge {
+  position: absolute;
+  top: -7px;
+  right: 8px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  font-size: 10px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-weight: bold;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.4);
+  white-space: nowrap;
+}
+.dg-amount {
+  font-size: 22px;
+  font-weight: 800;
+  color: #2c5364;
+  text-align: center;
+  line-height: 1.1;
+  margin: 6px 0 2px;
+  letter-spacing: -0.5px;
+}
+.dg-amount-currency {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  margin-right: 2px;
+}
+.dg-name {
+  font-weight: bold;
+  font-size: 13px;
+  text-align: center;
+  margin-bottom: 8px;
+  color: #1f2937;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.dg-meta {
+  font-size: 10.5px;
+  color: #6b7280;
+  line-height: 1.6;
+  margin-bottom: 6px;
+  flex: 1;
+}
+.dg-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+.dg-patients-tag {
+  font-size: 10px;
+  color: #0f766e;
+  background: linear-gradient(90deg, #ccfbf1, #f0fdfa);
+  padding: 4px 8px;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  line-height: 1.4;
+  font-weight: 500;
+}
+.dg-status-pill {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 3px 8px;
+  border-radius: 10px;
+  margin-bottom: 6px;
+  text-align: center;
+}
+.dg-status-pill.confirmed { background: #dcfce7; color: #14532d; }
+.dg-status-pill.pending { background: #fef9c3; color: #713f12; }
+.dg-status-pill.cancelled { background: #fee2e2; color: #7f1d1d; }
+.dg-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  margin-top: auto;
+}
+.dg-actions button {
+  padding: 6px 2px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease;
+  line-height: 1;
+}
+.dg-actions button:hover { background: #f9fafb; }
+.dg-actions button.confirm { background: #dcfce7; border-color: #86efac; }
+.dg-actions button.pending { background: #fef9c3; border-color: #fde047; }
+.dg-actions button.cancel { background: #fee2e2; border-color: #fca5a5; }
+.dg-actions button.edit { background: #dbeafe; border-color: #93c5fd; }
+.dg-actions button.del { background: #fee2e2; border-color: #fca5a5; }
+.dg-actions button.admin-confirm {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  border-color: #d97706;
+  color: white;
+  font-weight: bold;
+  grid-column: span 3;
+  padding: 7px;
+  font-size: 11px;
+}
+.dg-actions button.admin-unconfirm {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #92400e;
+  grid-column: span 3;
+  padding: 5px;
+  font-size: 10px;
+}
+
+/* New donation animation */
+.dg-card.is-new {
+  animation: newDonationEntrance 1.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes newDonationEntrance {
+  0% {
+    transform: scale(0.85) translateY(-10px);
+    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.6), 0 0 30px rgba(34, 197, 94, 0.8);
+    background-color: #bbf7d0;
+  }
+  30% {
+    transform: scale(1.02);
+    background-color: #dcfce7;
+  }
+  60% {
+    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.3), 0 4px 14px rgba(34, 197, 94, 0.3);
+    background-color: #f0fdf4;
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    background-color: white;
+  }
+}
+
+/* Stat counter pulse */
+.stat .num.updated {
+  animation: numPulse 0.6s ease-out;
+}
+@keyframes numPulse {
+  0% { transform: scale(1); color: #2c5364; }
+  50% { transform: scale(1.18); color: #16a34a; }
+  100% { transform: scale(1); color: #2c5364; }
+}
+
+/* ===== FAB ===== */
+#fab {
+  position: fixed;
+  bottom: 78px;
+  left: 16px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2c5364, #1a3744);
+  color: white;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(44, 83, 100, 0.45);
+  z-index: 95;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+}
+#fab:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(44, 83, 100, 0.55);
+}
+#fab:active { transform: scale(0.94); }
+#fab.hidden { display: none; }
+
+/* ===== Smooth transitions ===== */
+.donation-card, .patient-card, .member-card, .donor-card, .expense-card, .pg-card {
+  transition: transform 0.15s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+button { transition: background 0.15s ease, transform 0.1s ease; }
+
+/* Better empty states */
+.empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #9ca3af;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+/* Search row polish */
+.search-row { display: flex; gap: 6px; margin-bottom: 12px; }
+.search-row input, .search-row select {
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  background: white;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.search-row input:focus, .search-row select:focus {
+  border-color: #2c5364;
+  box-shadow: 0 0 0 3px rgba(44, 83, 100, 0.1);
+}
+.search-row input { flex: 1; }
+
+/* Donation card (legacy - kept for list view if needed elsewhere) */
+.donation-card {
+  background: white;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+  border-right: 4px solid #ccc;
+}
+.donation-card.confirmed { border-right-color: #16a34a; }
+.donation-card.pending { border-right-color: #eab308; }
+.donation-card.cancelled { border-right-color: #dc2626; opacity: 0.65; }
+.donation-card.admin-confirmed {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  border-right: 5px solid #f59e0b;
+  box-shadow: 0 0 0 2px #fde68a, 0 4px 14px rgba(245, 158, 11, 0.25);
+  position: relative;
+}
+.admin-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-weight: bold;
+  margin-bottom: 6px;
+  box-shadow: 0 2px 4px rgba(245, 158, 11, 0.4);
+  animation: badgePulse 2s ease-in-out infinite;
+}
+@keyframes badgePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+.donation-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 8px;
+}
+.donation-name {
+  font-weight: bold;
+  font-size: 15px;
+  color: #222;
+}
+.donation-amount {
+  color: #2c5364;
+  font-weight: bold;
+  font-size: 17px;
+  white-space: nowrap;
+}
+.donation-meta {
+  font-size: 12px;
+  color: #666;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 6px;
+}
+.donation-meta span { display: inline-flex; align-items: center; gap: 3px; }
+.donation-notes {
+  font-size: 13px;
+  color: #555;
+  margin-top: 6px;
+  background: #f5f6f8;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+.donation-actions {
+  display: flex;
+  gap: 5px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.donation-actions button {
+  flex: 1;
+  min-width: 60px;
+  padding: 6px 4px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.donation-actions button.confirm { background: #dcfce7; border-color: #86efac; color: #14532d; }
+.donation-actions button.pending { background: #fef9c3; border-color: #fde047; color: #713f12; }
+.donation-actions button.cancel { background: #fee2e2; border-color: #fca5a5; color: #7f1d1d; }
+.donation-actions button.edit { background: #dbeafe; border-color: #93c5fd; color: #1e3a8a; }
+.donation-actions button.del { background: #fee2e2; border-color: #fca5a5; color: #7f1d1d; }
+.donation-actions button.admin-confirm {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  border-color: #d97706;
+  color: white;
+  font-weight: bold;
+  flex: 1.5;
+}
+.donation-actions button.admin-unconfirm {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #92400e;
+}
+
+/* ===== Modal ===== */
+.modal-bg {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 14px;
+}
+.modal-bg.hidden { display: none; }
+.modal {
+  background: white;
+  border-radius: 14px;
+  padding: 18px;
+  width: 100%;
+  max-width: 440px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.modal h3 {
+  font-size: 16px;
+  color: #2c5364;
+  margin-bottom: 12px;
+}
+.modal-actions { display: flex; gap: 6px; margin-top: 12px; }
+.modal-actions button {
+  flex: 1;
+  padding: 11px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  border: 1px solid #ddd;
+  background: white;
+  font-family: inherit;
+}
+.modal-actions .primary { background: #2c5364; color: white; border-color: #2c5364; }
+
+/* ===== Connection ===== */
+.conn-status {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fbbf24;
+}
+.conn-status.online { background: #4ade80; }
+.conn-status.offline { background: #f87171; }
+
+/* ===== Donor file ===== */
+.donor-card {
+  background: white;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+  cursor: pointer;
+  border-right: 3px solid #2c5364;
+}
+.donor-card:active { transform: scale(0.99); }
+.donor-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.donor-name { font-weight: bold; font-size: 15px; }
+.donor-total { color: #16a34a; font-weight: bold; font-size: 15px; }
+.donor-sub {
+  font-size: 12px;
+  color: #777;
+  display: flex;
+  gap: 12px;
+  margin-top: 5px;
+  flex-wrap: wrap;
+}
+
+.empty {
+  text-align: center;
+  padding: 30px 20px;
+  color: #999;
+  font-size: 14px;
+}
+
+/* ===== Admin ===== */
+.admin-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.admin-card {
+  background: white;
+  border-radius: 12px;
+  padding: 12px;
+  text-align: center;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+}
+.admin-card .num {
+  font-size: 20px;
+  font-weight: bold;
+  color: #2c5364;
+}
+.admin-card .lbl {
+  font-size: 11px;
+  color: #777;
+  margin-top: 3px;
+}
+.admin-actions { display: flex; gap: 8px; margin-top: 12px; }
+.admin-actions button {
+  flex: 1;
+  padding: 11px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+}
+.member-header {
+  background: #2c5364;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin: 14px 0 6px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ===== Members management ===== */
+.member-card {
+  background: white;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+  border-right: 4px solid #2c5364;
+}
+.member-card.inactive { opacity: 0.55; border-right-color: #999; }
+.member-card.admin-role { border-right-color: #f59e0b; background: linear-gradient(135deg,#fffbeb,white); }
+.member-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.member-info { flex: 1; }
+.member-name { font-weight: bold; font-size: 15px; }
+.member-username { font-size: 12px; color: #777; margin-top: 2px; }
+.member-role-tag {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-right: 6px;
+  font-weight: bold;
+}
+.role-admin { background: #fef3c7; color: #92400e; }
+.role-member { background: #dbeafe; color: #1e40af; }
+.role-inactive { background: #fee2e2; color: #7f1d1d; }
+.member-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 8px 0;
+  padding: 8px;
+  background: #f5f6f8;
+  border-radius: 8px;
+}
+.member-stat {
+  text-align: center;
+}
+.member-stat .v { font-weight: bold; font-size: 14px; color: #2c5364; }
+.member-stat .l { font-size: 10px; color: #777; margin-top: 2px; }
+.member-actions {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.member-actions button {
+  flex: 1;
+  min-width: 70px;
+  padding: 7px 4px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.member-actions button.pdf { background: #fce7f3; border-color: #f9a8d4; color: #831843; }
+.member-actions button.stats { background: #dbeafe; border-color: #93c5fd; color: #1e3a8a; }
+.member-actions button.edit { background: #f3e8ff; border-color: #c4b5fd; color: #5b21b6; }
+.member-actions button.pwd { background: #fef3c7; border-color: #fde047; color: #713f12; }
+.member-actions button.toggle { background: #e0e7ff; border-color: #a5b4fc; color: #3730a3; }
+.member-actions button.del { background: #fee2e2; border-color: #fca5a5; color: #7f1d1d; }
+
+/* For non-admin: hide members tab */
+.admin-only { display: none; }
+body.is-admin .admin-only { display: flex; }
+
+/* ===== Patients ===== */
+.patients-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+@media (min-width: 600px) {
+  .patients-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (min-width: 900px) {
+  .patients-grid { grid-template-columns: repeat(4, 1fr); }
+}
+.section-title {
+  font-size: 13px;
+  color: #777;
+  margin: 14px 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #e5e7eb;
+}
+
+.pg-card {
+  background: white;
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  border-top: 4px solid #2c5364;
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+}
+.pg-card:active { transform: scale(0.98); }
+.pg-card.completed {
+  border-top-color: #16a34a;
+  background: linear-gradient(180deg, #f0fdf4 0%, white 60%);
+}
+.pg-card.completed::before {
+  content: '✓ اكتمل';
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: #16a34a;
+  color: white;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: bold;
+}
+.pg-card.closed {
+  opacity: 0.55;
+  border-top-color: #999;
+}
+.pg-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+.pg-num {
+  background: #2c5364;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: bold;
+  font-size: 11px;
+}
+.pg-name {
+  font-weight: bold;
+  font-size: 14px;
+  line-height: 1.3;
+  margin-bottom: 2px;
+  color: #1a1a1a;
+}
+.pg-cond {
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 8px;
+  min-height: 14px;
+}
+.pg-stats {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+.pg-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+}
+.pg-row.big {
+  font-size: 13px;
+  padding-top: 6px;
+  border-top: 1px dashed #d1d5db;
+  margin-top: 4px;
+}
+.pg-row b { font-weight: bold; }
+.pg-row .bal-in { color: #16a34a; }
+.pg-row .bal-out { color: #dc2626; }
+.pg-row .bal-net { color: #2c5364; }
+.pg-row .bal-net.negative { color: #dc2626; }
+.pg-progress {
+  margin-bottom: 8px;
+}
+.pg-progress-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #777;
+  margin-bottom: 4px;
+}
+.pg-progress-bar {
+  height: 6px;
+  background: #e5e7eb;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.pg-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2c5364, #4ade80);
+  transition: width 0.3s;
+}
+.pg-progress-fill.full {
+  background: linear-gradient(90deg, #16a34a, #22c55e);
+}
+.pg-complete-btn {
+  width: 100%;
+  padding: 8px;
+  background: #16a34a;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  font-family: inherit;
+  margin-top: auto;
+}
+.pg-complete-btn.target-reached {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  box-shadow: 0 2px 8px rgba(34,197,94,0.4);
+  animation: pulse 2s infinite;
+}
+.pg-reopen-btn {
+  width: 100%;
+  padding: 6px;
+  background: white;
+  color: #2c5364;
+  border: 1px solid #2c5364;
+  border-radius: 8px;
+  font-size: 11px;
+  cursor: pointer;
+  font-family: inherit;
+  margin-top: auto;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.85; }
+}
+
+.patient-card {
+  background: white;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+  border-right: 4px solid #2c5364;
+  cursor: pointer;
+}
+.patient-card:active { transform: scale(0.99); }
+.patient-card.completed { border-right-color: #16a34a; }
+.patient-card.closed { opacity: 0.55; border-right-color: #999; }
+.patient-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.patient-name { font-weight: bold; font-size: 15px; }
+.patient-condition { font-size: 12px; color: #777; margin-top: 2px; }
+.patient-status-tag {
+  display: inline-block;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: bold;
+  margin-right: 4px;
+}
+.tag-active { background: #dbeafe; color: #1e40af; }
+.tag-completed { background: #dcfce7; color: #14532d; }
+.tag-closed { background: #f3f4f6; color: #4b5563; }
+.balance-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+  margin: 8px 0;
+  padding: 8px;
+  background: #f5f6f8;
+  border-radius: 8px;
+}
+.balance-cell {
+  text-align: center;
+  padding: 4px;
+}
+.balance-cell .v { font-weight: bold; font-size: 14px; }
+.balance-cell .l { font-size: 10px; color: #777; margin-top: 2px; }
+.bal-in { color: #16a34a; }
+.bal-out { color: #dc2626; }
+.bal-net { color: #2c5364; }
+.bal-net.negative { color: #dc2626; }
+.progress-bar {
+  height: 6px;
+  background: #e5e7eb;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2c5364, #4ade80);
+  transition: width 0.3s;
+}
+
+/* Patient chip selector in donation form */
+.patients-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  background: #fafafa;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  min-height: 44px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+.patient-chip {
+  padding: 6px 12px;
+  border: 1.5px solid #ddd;
+  background: white;
+  border-radius: 16px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  user-select: none;
+}
+.patient-chip.selected {
+  background: #2c5364;
+  color: white;
+  border-color: #2c5364;
+}
+.patient-chip-empty {
+  color: #999;
+  font-size: 12px;
+  padding: 8px;
+  text-align: center;
+  width: 100%;
+}
+
+/* Expense items */
+.expense-card {
+  background: #fff5f5;
+  border-right: 3px solid #dc2626;
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 6px;
+}
+.expense-card.donation-in {
+  background: #f0fdf4;
+  border-right-color: #16a34a;
+}
+.expense-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.expense-desc { font-weight: 500; font-size: 14px; }
+.expense-amount { font-weight: bold; }
+.expense-meta {
+  font-size: 11px;
+  color: #777;
+  margin-top: 4px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.invoice-thumb {
+  margin-top: 6px;
+  max-width: 80px;
+  max-height: 80px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  cursor: pointer;
+  display: block;
+}
+
+/* Image preview modal */
+.image-preview-bg {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 400;
+  padding: 20px;
+}
+.image-preview-bg.hidden { display: none; }
+.image-preview-bg img {
+  max-width: 100%;
+  max-height: 90vh;
+  border-radius: 8px;
+}
+.image-preview-close {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  background: white;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+/* PDF report style */
+.pdf-report {
+  font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+  direction: rtl;
+  padding: 20px;
+  color: #222;
+  background: white;
+}
+.pdf-report h1 { color: #2c5364; font-size: 22px; margin-bottom: 4px; text-align: center; }
+.pdf-report .subtitle { text-align: center; color: #666; margin-bottom: 20px; font-size: 13px; }
+.pdf-report .summary-box {
+  background: #eef4f7;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 15px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.pdf-report .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pdf-report table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+.pdf-report th { background: #2c5364; color: white; padding: 8px 6px; text-align: right; font-weight: bold; }
+.pdf-report td { padding: 7px 6px; border-bottom: 1px solid #e8e8e8; }
+.pdf-report tr:nth-child(even) td { background: #fafbfc; }
+.pdf-report .footer { margin-top: 20px; text-align: center; font-size: 11px; color: #999; }
+.pdf-report .totals { background: #2c5364; color: white; font-weight: bold; }
+.pdf-report .badge-admin { background: #f59e0b; color: white; padding: 1px 6px; border-radius: 3px; font-size: 10px; }
+
+/* ===== Toast ===== */
+#toast {
+  position: fixed;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1f2937;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 13px;
+  z-index: 300;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+#toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- ===== Login Screen ===== -->
+<div id="login">
+  <div class="login-box">
+    <h1>📞 سجل تبرعات اللجنة</h1>
+    <p>أدخل بياناتك للدخول</p>
+    <input id="loginUser" placeholder="اسم المستخدم" autocomplete="off" autocapitalize="off">
+    <input id="loginPass" type="password" placeholder="كلمة المرور">
+    <button onclick="doLogin()">دخول</button>
+    <button id="bootstrapBtn" onclick="bootstrapAdmin()" style="background:#e8eef0;color:#2c5364;margin-top:14px;font-size:13px;font-weight:600">⚙️ إنشاء حساب المشرف الأول (مرة واحدة)</button>
+  </div>
+</div>
+
+<!-- ===== App ===== -->
+<div id="app" class="hidden">
+  <header>
+    <h1>📞 سجل التبرعات</h1>
+    <div class="user-info">
+      <span class="conn-status" id="connDot" title="حالة الاتصال"></span>
+      <span id="userBadge"></span>
+      <button onclick="openMyPwd()" title="تغيير كلمة مروري">🔑</button>
+      <button onclick="doLogout()">خروج</button>
+    </div>
+  </header>
+
+  <div class="statbar">
+    <div class="stat"><span class="num" id="statTotal">0</span><span class="lbl">الإجمالي $</span></div>
+    <div class="stat"><span class="num" id="statCount">0</span><span class="lbl">تبرعات</span></div>
+    <div class="stat"><span class="num" id="statPatients">0</span><span class="lbl">مرضى</span></div>
+    <div class="stat"><span class="num" id="statConfirmed">0</span><span class="lbl">مؤكد</span></div>
+  </div>
+
+  <!-- ===== New Donation ===== -->
+  <section id="sec-new">
+    <h2>➕ إضافة تبرع جديد</h2>
+    <div class="form-card">
+      <div class="form-row">
+        <label>نوع المتبرع</label>
+        <div class="toggle-row">
+          <button class="toggle-btn active" id="tgNamed" onclick="toggleAnonymous(false)">باسم</button>
+          <button class="toggle-btn" id="tgAnon" onclick="toggleAnonymous(true)">فاعل خير</button>
+        </div>
+      </div>
+
+      <div class="form-row" id="rowName">
+        <label>الاسم</label>
+        <input id="inpName" placeholder="اسم المتبرع" autocomplete="off">
+      </div>
+
+      <div class="form-row">
+        <label>رقم الهاتف</label>
+        <input id="inpPhone" type="tel" placeholder="مثلاً: 71234567" autocomplete="off">
+      </div>
+
+      <div class="form-row">
+        <label>عبر من / المُحوِّل</label>
+        <input id="inpVia" placeholder="اختياري - من قام بالتحويل" autocomplete="off">
+      </div>
+
+      <div class="form-row" style="display:flex;gap:8px">
+        <div style="flex:2">
+          <label>المبلغ ($)</label>
+          <input id="inpAmount" type="number" inputmode="decimal" placeholder="0" step="0.01" min="0">
+        </div>
+        <div style="flex:1">
+          <label>عدد المرضى</label>
+          <input id="inpPatients" type="number" inputmode="numeric" value="1" min="1">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <label>تخصيص لمرضى محددين</label>
+        <div class="toggle-row">
+          <button class="toggle-btn active" id="tgGeneral" onclick="toggleAssign(false)">تبرع عام</button>
+          <button class="toggle-btn" id="tgSpecific" onclick="toggleAssign(true)">لمرضى محددين</button>
+        </div>
+      </div>
+
+      <div class="form-row" id="rowPatientChips" style="display:none">
+        <label>اختر المرضى (المبلغ يُقسم بالتساوي)</label>
+        <div class="patients-chips" id="patientChips"></div>
+        <div id="splitPreview" style="font-size:12px;color:#2c5364;margin-top:6px;font-weight:bold"></div>
+      </div>
+
+      <div class="form-row">
+        <label>الحالة</label>
+        <div class="toggle-row">
+          <button class="toggle-btn" id="stPending" onclick="setStatus('pending')">قيد المتابعة</button>
+          <button class="toggle-btn active" id="stConfirmed" onclick="setStatus('confirmed')">مؤكد ✓</button>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <label>ملاحظات</label>
+        <textarea id="inpNotes" rows="2" placeholder="ملاحظات اختيارية"></textarea>
+      </div>
+
+      <button class="btn-submit" id="btnAdd" onclick="addDonation()">💾 حفظ التبرع</button>
+    </div>
+  </section>
+
+  <!-- ===== Live Feed ===== -->
+  <section id="sec-feed">
+    <h2>📋 السجل المباشر</h2>
+    <div class="search-row">
+      <input id="srchFeed" placeholder="🔍 بحث (اسم / هاتف / عبر)">
+      <select id="filterFeed">
+        <option value="all">الكل</option>
+        <option value="admin">⭐ مؤكد المشرف</option>
+        <option value="confirmed">مؤكد</option>
+        <option value="pending">قيد المتابعة</option>
+        <option value="cancelled">ملغى</option>
+      </select>
+    </div>
+    <div id="feedList"></div>
+  </section>
+
+  <!-- ===== Donor Files ===== -->
+  <section id="sec-files">
+    <h2>👤 ملفات المتبرعين</h2>
+    <div class="search-row">
+      <input id="srchFiles" placeholder="🔍 بحث عن متبرع">
+    </div>
+    <div id="filesList"></div>
+  </section>
+
+  <!-- ===== Admin ===== -->
+  <section id="sec-admin">
+    <h2>📊 لوحة الإدارة</h2>
+    <div class="admin-grid">
+      <div class="admin-card"><div class="num" id="admTotal">0</div><div class="lbl">الإجمالي $</div></div>
+      <div class="admin-card"><div class="num" id="admConfirmedAmt">0</div><div class="lbl">المؤكد $</div></div>
+      <div class="admin-card" style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:2px solid #f59e0b"><div class="num" id="admAdminConfirmedAmt" style="color:#d97706">0</div><div class="lbl">⭐ مؤكد المشرف $</div></div>
+      <div class="admin-card"><div class="num" id="admPendingAmt">0</div><div class="lbl">قيد المتابعة $</div></div>
+      <div class="admin-card"><div class="num" id="admDonors">0</div><div class="lbl">عدد المتبرعين</div></div>
+      <div class="admin-card"><div class="num" id="admPatients">0</div><div class="lbl">إجمالي المرضى</div></div>
+      <div class="admin-card"><div class="num" id="admToday">0</div><div class="lbl">تبرعات اليوم</div></div>
+    </div>
+
+    <h2 style="margin-top:18px">📁 سجل المسؤولين</h2>
+    <div class="search-row">
+      <input id="srchAdmin" placeholder="🔍 بحث">
+      <select id="filterAdmin">
+        <option value="all">كل المسؤولين</option>
+      </select>
+    </div>
+    <div id="adminList"></div>
+
+    <div class="admin-actions">
+      <button onclick="exportCSV()">📥 تصدير CSV</button>
+      <button onclick="exportBackup()">💾 نسخة احتياطية</button>
+      <button onclick="generateFullReport()">📄 تقرير PDF شامل</button>
+    </div>
+  </section>
+
+  <!-- ===== Patients ===== -->
+  <section id="sec-patients" class="active">
+    <h2>🏥 المرضى الحاليون</h2>
+    <button class="btn-submit" onclick="openAddPatient()" style="margin-bottom:14px">➕ فتح ملف مريض جديد</button>
+    <div class="search-row">
+      <input id="srchPatients" placeholder="🔍 بحث">
+      <select id="filterPatients">
+        <option value="active">النشطين</option>
+        <option value="all">الكل</option>
+        <option value="completed">المكتملة</option>
+        <option value="closed">المغلقة</option>
+      </select>
+    </div>
+    <div id="patientsList"></div>
+  </section>
+
+  <!-- ===== Members Management ===== -->
+  <section id="sec-members">
+    <h2>👥 إدارة الأعضاء</h2>
+    <button class="btn-submit" onclick="openAddMember()" style="margin-bottom:14px">➕ إضافة عضو جديد</button>
+    <div class="search-row">
+      <input id="srchMembers" placeholder="🔍 بحث عن عضو">
+    </div>
+    <div id="membersList"></div>
+  </section>
+
+  <!-- ===== Floating Action Button ===== -->
+  <button id="fab" onclick="switchTab('new')" title="تبرع جديد">➕</button>
+
+  <!-- ===== Bottom Nav ===== -->
+  <nav>
+    <button class="active" data-tab="patients" onclick="switchTab('patients')">
+      <span class="icon">🏥</span><span>الرئيسية</span>
+    </button>
+    <button data-tab="new" onclick="switchTab('new')">
+      <span class="icon">➕</span><span>تبرع</span>
+    </button>
+    <button data-tab="feed" onclick="switchTab('feed')">
+      <span class="icon">📋</span><span>السجل</span>
+    </button>
+    <button data-tab="files" onclick="switchTab('files')">
+      <span class="icon">👤</span><span>متبرعين</span>
+    </button>
+    <button data-tab="members" class="admin-only" onclick="switchTab('members')">
+      <span class="icon">👥</span><span>الأعضاء</span>
+    </button>
+    <button data-tab="admin" onclick="switchTab('admin')">
+      <span class="icon">📊</span><span>الإدارة</span>
+    </button>
+  </nav>
+</div>
+
+<!-- ===== Edit Modal ===== -->
+<div class="modal-bg hidden" id="editModal">
+  <div class="modal">
+    <h3>✎ تعديل التبرع</h3>
+    <div class="form-row"><label>الاسم</label><input id="edName"></div>
+    <div class="form-row"><label>الهاتف</label><input id="edPhone"></div>
+    <div class="form-row"><label>عبر من</label><input id="edVia"></div>
+    <div class="form-row" style="display:flex;gap:8px">
+      <div style="flex:2"><label>المبلغ</label><input id="edAmount" type="number" step="0.01"></div>
+      <div style="flex:1"><label>عدد المرضى</label><input id="edPatients" type="number" min="1"></div>
+    </div>
+    <div class="form-row"><label>الحالة</label>
+      <select id="edStatus">
+        <option value="confirmed">مؤكد</option>
+        <option value="pending">قيد المتابعة</option>
+        <option value="cancelled">ملغى</option>
+      </select>
+    </div>
+    <div class="form-row"><label>ملاحظات</label><textarea id="edNotes" rows="2"></textarea></div>
+    <div class="modal-actions">
+      <button onclick="closeEdit()">إلغاء</button>
+      <button class="primary" onclick="saveEdit()">حفظ التعديلات</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Donor Profile Modal ===== -->
+<div class="modal-bg hidden" id="donorModal">
+  <div class="modal">
+    <h3 id="donorTitle">👤 ملف المتبرع</h3>
+    <div id="donorContent"></div>
+    <div class="modal-actions">
+      <button onclick="closeDonor()">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- ===== Member Add/Edit Modal ===== -->
+<div class="modal-bg hidden" id="memberModal">
+  <div class="modal">
+    <h3 id="memberModalTitle">➕ إضافة عضو جديد</h3>
+    <div class="form-row">
+      <label>اسم المستخدم (بالإنجليزية)</label>
+      <input id="mmUsername" placeholder="مثلاً: ahmad" autocomplete="off">
+    </div>
+    <div class="form-row">
+      <label>الاسم الكامل</label>
+      <input id="mmName" placeholder="اسم العضو" autocomplete="off">
+    </div>
+    <div class="form-row" id="mmPwdRow">
+      <label>كلمة المرور</label>
+      <input id="mmPwd" type="text" placeholder="كلمة المرور" autocomplete="off">
+    </div>
+    <div class="form-row">
+      <label>الصلاحية</label>
+      <div class="toggle-row">
+        <button class="toggle-btn active" id="mmRoleMember" onclick="setMemberRole('member')">عضو لجنة</button>
+        <button class="toggle-btn" id="mmRoleAdmin" onclick="setMemberRole('admin')">مشرف 👑</button>
+      </div>
+    </div>
+    <div class="form-row">
+      <label>الحالة</label>
+      <div class="toggle-row">
+        <button class="toggle-btn active" id="mmActive" onclick="setMemberActive(true)">نشط</button>
+        <button class="toggle-btn" id="mmInactive" onclick="setMemberActive(false)">معطّل</button>
+      </div>
+    </div>
+    <div class="form-row">
+      <label>الهاتف (اختياري)</label>
+      <input id="mmPhone" placeholder="رقم الهاتف" autocomplete="off">
+    </div>
+    <div class="modal-actions">
+      <button onclick="closeMember()">إلغاء</button>
+      <button class="primary" onclick="saveMember()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Member Stats Modal ===== -->
+<div class="modal-bg hidden" id="memberStatsModal">
+  <div class="modal">
+    <h3 id="memberStatsTitle">📊 إحصاءات العضو</h3>
+    <div id="memberStatsContent"></div>
+    <div class="modal-actions">
+      <button onclick="closeMemberStats()">إغلاق</button>
+      <button class="primary" id="memberPdfBtn">📄 تقرير PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Change Password Modal ===== -->
+<div class="modal-bg hidden" id="pwdModal">
+  <div class="modal">
+    <h3>🔑 تغيير كلمة المرور</h3>
+    <div class="form-row">
+      <label>العضو</label>
+      <input id="pwdMember" disabled style="background:#f5f6f8">
+    </div>
+    <div class="form-row">
+      <label>كلمة المرور الجديدة</label>
+      <input id="pwdNew" type="text" placeholder="كلمة المرور الجديدة">
+    </div>
+    <p id="pwdNote" style="font-size:12px;line-height:1.5;margin:-4px 0 10px"></p>
+    <div class="modal-actions">
+      <button onclick="closePwd()">إلغاء</button>
+      <button class="primary" onclick="savePwd()">تحديث</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Patient Add/Edit Modal ===== -->
+<div class="modal-bg hidden" id="patientModal">
+  <div class="modal">
+    <h3 id="patientModalTitle">➕ فتح ملف مريض</h3>
+    <div class="form-row">
+      <label>اسم المريض / الحالة</label>
+      <input id="ptName" placeholder="مثلاً: محمد علي - أو حالة رقم 1" autocomplete="off">
+    </div>
+    <div class="form-row">
+      <label>الحالة المرضية / تفاصيل (اختياري)</label>
+      <input id="ptCondition" placeholder="مثلاً: علاج كيماوي" autocomplete="off">
+    </div>
+    <div class="form-row">
+      <label>المبلغ المطلوب ($ - اختياري)</label>
+      <input id="ptTarget" type="number" inputmode="decimal" placeholder="0" step="0.01" min="0">
+    </div>
+    <div class="form-row">
+      <label>الحالة</label>
+      <select id="ptStatus">
+        <option value="active">نشط</option>
+        <option value="completed">مكتمل</option>
+        <option value="closed">مغلق</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>ملاحظات</label>
+      <textarea id="ptNotes" rows="2" placeholder="معلومات إضافية"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button onclick="closePatient()">إلغاء</button>
+      <button class="primary" onclick="savePatient()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Patient Detail Modal ===== -->
+<div class="modal-bg hidden" id="patientDetailModal">
+  <div class="modal" style="max-width: 500px">
+    <h3 id="pdTitle">🏥 ملف المريض</h3>
+    <div id="pdContent"></div>
+    <div class="modal-actions">
+      <button onclick="closePatientDetail()">إغلاق</button>
+      <button class="primary" id="pdPdfBtn">📄 تقرير PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Expense Add Modal ===== -->
+<div class="modal-bg hidden" id="expenseModal">
+  <div class="modal">
+    <h3 id="expModalTitle">💸 تسجيل دفعة / فاتورة</h3>
+    <div class="form-row">
+      <label>المريض</label>
+      <input id="expPatient" disabled style="background:#f5f6f8">
+    </div>
+    <div class="form-row">
+      <label>المبلغ المدفوع ($)</label>
+      <input id="expAmount" type="number" inputmode="decimal" placeholder="0" step="0.01" min="0.01">
+    </div>
+    <div class="form-row">
+      <label>وصف الدفعة</label>
+      <input id="expDesc" placeholder="مثلاً: فاتورة دواء / مستشفى" autocomplete="off">
+    </div>
+    <div class="form-row">
+      <label>صورة الفاتورة (اختياري)</label>
+      <input id="expImage" type="file" accept="image/*" capture="environment">
+      <div id="expImagePreview" style="margin-top:6px"></div>
+    </div>
+    <div class="form-row">
+      <label>ملاحظات</label>
+      <textarea id="expNotes" rows="2" placeholder="ملاحظات اختيارية"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button onclick="closeExpense()">إلغاء</button>
+      <button class="primary" id="saveExpenseBtn" onclick="saveExpense()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Image Preview ===== -->
+<div class="image-preview-bg hidden" id="imgPreview" onclick="closeImgPreview()">
+  <button class="image-preview-close">✕</button>
+  <img id="imgPreviewImg" src="" alt="">
+</div>
+
+<!-- ===== PDF Hidden Container ===== -->
+<div id="pdfContainer" style="position:fixed;left:-10000px;top:0;width:800px"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+/* ============================================================
+   ⚠️ ضع هنا إعدادات Firebase الخاصة بمشروعك
+   ============================================================ */
+const firebaseConfig = {
+  apiKey: "AIzaSyAj3wzpGO_K7REs32ObIDaR5iWMuRTGS4w",
+  authDomain: "lajna-c9a6b.firebaseapp.com",
+  projectId: "lajna-c9a6b",
+  storageBucket: "lajna-c9a6b.firebasestorage.app",
+  messagingSenderId: "219954860424",
+  appId: "1:219954860424:web:2f27887914297766252a3d"
+};
+
+const COLLECTION = 'donations';
+const USERS_COLLECTION = 'users';
+const PATIENTS_COLLECTION = 'patients';
+const EXPENSES_COLLECTION = 'expenses';
+
+/* ============================================================
+   إعدادات Cloudinary - اختياري لرفع صور الفواتير
+   اتركها فارغة لتعطيل الصور
+   ============================================================ */
+const CLOUDINARY_CONFIG = {
+  cloudName: '',     // مثلاً: 'mycloud'
+  uploadPreset: ''   // unsigned preset
+};
+
+/* ============================================================
+   نظام الدخول الآمن (Firebase Authentication)
+   ------------------------------------------------------------
+   اسم المستخدم يُحوَّل داخلياً إلى بريد وهمي للدخول.
+   مثال: العضو "ahmad" -> "ahmad@lajna.local"
+   كلمات المرور تُدار بالكامل من Firebase ولا تُخزَّن لدينا إطلاقاً.
+   ============================================================ */
+const USERNAME_DOMAIN = '@lajna.local';
+const toEmail = (username) => username.trim().toLowerCase() + USERNAME_DOMAIN;
+
+/* المشرف الأول: يُنشأ مرة واحدة فقط عند أول تشغيل عبر زر
+   "إنشاء حساب المشرف الأول" في شاشة الدخول.
+   هذه القيمة تُستعمل فقط لتحديد اسم مستخدم المشرف الافتراضي. */
+const DEFAULT_ADMIN = {
+  username: 'admin',
+  role: 'admin',
+  name: 'المشرف الرئيسي'
+};
+
+/* ============================================================
+   الحالة
+   ============================================================ */
+let db = null;
+let auth = null;
+let secondaryApp = null; // تطبيق ثانوي لإنشاء حسابات الأعضاء دون إخراج المشرف
+let currentUser = null;
+let donations = [];
+let allMembers = {}; // username -> {name, role, active, ...} (بدون كلمة مرور)
+let patients = []; // [{id, name, condition, status, targetAmount, ...}]
+let expenses = []; // [{id, patientId, amount, description, invoiceUrl, ...}]
+let anonymous = false;
+let statusChoice = 'confirmed';
+let assignMode = false; // false = general donation, true = specific patients
+let selectedPatientIds = []; // for donation form
+let editingId = null;
+let editingMemberId = null;
+let editingPatientId = null;
+let editingExpenseId = null;
+let currentPatientDetailId = null;
+let memberRoleChoice = 'member';
+let memberActiveChoice = true;
+let pwdTargetUser = null;
+let pendingExpenseImage = null; // {file, dataUrl} during expense creation
+let unsubscribe = null;
+let usersUnsubscribe = null;
+let patientsUnsubscribe = null;
+let expensesUnsubscribe = null;
+let donorGroups = {};
+
+/* ============================================================
+   تهيئة Firebase
+   ============================================================ */
+function initFirebase() {
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    auth = firebase.auth();
+    // الاحتفاظ بالجلسة على الجهاز (تذكُّر تلقائي وآمن)
+    auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(() => {});
+    // Try to enable offline cache (silent fail if multiple tabs / unsupported browser)
+    db.enablePersistence().catch(() => {});
+    return true;
+  } catch (e) {
+    console.error('Firebase init failed:', e);
+    return false;
+  }
+}
+
+/* تطبيق Firebase ثانوي: نستخدمه لإنشاء حسابات الأعضاء.
+   إنشاء حساب عبر التطبيق الأساسي يسجّل الدخول تلقائياً بالحساب
+   الجديد ويُخرج المشرف — لذلك نعزل العملية في تطبيق منفصل. */
+function getSecondaryAuth() {
+  if (!secondaryApp) {
+    secondaryApp = firebase.initializeApp(firebaseConfig, 'secondary');
+  }
+  return secondaryApp.auth();
+}
+
+/* ============================================================
+   تسجيل الدخول
+   ============================================================ */
+async function doLogin() {
+  const u = document.getElementById('loginUser').value.trim().toLowerCase();
+  const p = document.getElementById('loginPass').value;
+
+  if (!u || !p) { alert('أدخل اسم المستخدم وكلمة المرور'); return; }
+
+  if (!db) initFirebase();
+  if (!auth) { alert('⚠️ Firebase غير مُعدّ - راجع firebaseConfig'); return; }
+
+  const btn = document.querySelector('#login button[onclick="doLogin()"]');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الدخول...'; }
+  const restoreBtn = () => { if (btn) { btn.disabled = false; btn.textContent = 'دخول'; } };
+
+  try {
+    // 1) المصادقة الحقيقية عبر Firebase
+    const cred = await auth.signInWithEmailAndPassword(toEmail(u), p);
+    const uid = cred.user.uid;
+
+    // 2) قراءة ملف العضو (الاسم/الدور/الحالة) من Firestore
+    let profile = {};
+    try {
+      const doc = await db.collection(USERS_COLLECTION).doc(u).get();
+      if (doc.exists) profile = doc.data();
+    } catch (e) { console.warn('Profile read failed, continuing:', e); }
+
+    if (profile.active === false) {
+      await auth.signOut();
+      restoreBtn();
+      alert('الحساب معطّل - راجع المشرف');
+      return;
+    }
+
+    currentUser = {
+      uid,
+      username: u,
+      name: profile.name || u,
+      role: profile.role || 'member',
+      phone: profile.phone || ''
+    };
+    restoreBtn();
+    enterApp();
+  } catch (e) {
+    restoreBtn();
+    console.error('Login error:', e);
+    const code = e.code || '';
+    if (code === 'auth/wrong-password' || code === 'auth/user-not-found' ||
+        code === 'auth/invalid-credential' || code === 'auth/invalid-login-credentials') {
+      alert('اسم المستخدم أو كلمة المرور غير صحيحة');
+    } else if (code === 'auth/too-many-requests') {
+      alert('محاولات كثيرة خاطئة - انتظر قليلاً ثم حاول مجدداً');
+    } else if (code === 'auth/network-request-failed') {
+      alert('فشل الاتصال بالإنترنت - تأكد من الشبكة وحاول مجدداً');
+    } else {
+      alert('تعذّر الدخول: ' + (e.message || 'خطأ غير معروف'));
+    }
+  }
+}
+
+/* إنشاء حساب المشرف الأول - يُستعمل مرة واحدة عند أول تشغيل.
+   يكتب اسم المستخدم وكلمة المرور في حقلي الدخول ثم يضغط هذا الزر. */
+async function bootstrapAdmin() {
+  const u = document.getElementById('loginUser').value.trim().toLowerCase() || DEFAULT_ADMIN.username;
+  const p = document.getElementById('loginPass').value;
+
+  if (!p || p.length < 6) {
+    alert('لإنشاء المشرف الأول:\n• اكتب اسم المستخدم (أو اتركه فارغاً لـ admin)\n• اكتب كلمة مرور قوية (6 أحرف على الأقل)\n• ثم اضغط هذا الزر');
+    return;
+  }
+  if (!/^[a-z0-9_]+$/.test(u)) { alert('اسم المستخدم يقبل أحرفاً إنجليزية صغيرة وأرقاماً و _ فقط'); return; }
+  if (!confirm(`إنشاء حساب المشرف الأول؟\n\nاسم المستخدم: ${u}\n\n⚠️ هذا الزر للإعداد الأول فقط. إن كان لديك مشرف بالفعل فاضغط "دخول".`)) return;
+
+  if (!db) initFirebase();
+  if (!auth) { alert('⚠️ Firebase غير مُعدّ - راجع firebaseConfig'); return; }
+
+  try {
+    const cred = await auth.createUserWithEmailAndPassword(toEmail(u), p);
+    await db.collection(USERS_COLLECTION).doc(u).set({
+      name: DEFAULT_ADMIN.name,
+      role: 'admin',
+      active: true,
+      phone: '',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    currentUser = { uid: cred.user.uid, username: u, name: DEFAULT_ADMIN.name, role: 'admin', phone: '' };
+    alert('✓ تم إنشاء حساب المشرف الأول بنجاح');
+    enterApp();
+  } catch (e) {
+    console.error('Bootstrap error:', e);
+    if ((e.code || '') === 'auth/email-already-in-use') {
+      alert('هذا الحساب موجود مسبقاً - استخدم زر "دخول"');
+    } else {
+      alert('فشل الإنشاء: ' + (e.message || 'خطأ غير معروف'));
+    }
+  }
+}
+
+function handleDbError(e, prefix) {
+  console.error(e);
+  if (e.code === 'unavailable' || (e.message || '').toLowerCase().includes('offline')) {
+    alert(prefix + ': لا يوجد اتصال بقاعدة البيانات\n\nتأكد من:\n• الاتصال بالإنترنت\n• قواعد Firestore تسمح بالكتابة');
+  } else if (e.code === 'permission-denied') {
+    alert(prefix + ': لا توجد صلاحية\n\nحدّث قواعد Firestore لتسمح بالوصول لمجموعتي donations و users');
+  } else {
+    alert(prefix + ': ' + (e.message || 'خطأ غير معروف'));
+  }
+}
+
+function doLogout() {
+  if (!confirm('هل تريد تسجيل الخروج؟')) return;
+  if (auth) auth.signOut().catch(() => {});
+  if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+  if (usersUnsubscribe) { usersUnsubscribe(); usersUnsubscribe = null; }
+  if (patientsUnsubscribe) { patientsUnsubscribe(); patientsUnsubscribe = null; }
+  if (expensesUnsubscribe) { expensesUnsubscribe(); expensesUnsubscribe = null; }
+  currentUser = null;
+  donations = [];
+  allMembers = {};
+  patients = [];
+  expenses = [];
+  document.body.classList.remove('is-admin');
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('login').classList.remove('hidden');
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+}
+
+function enterApp() {
+  document.getElementById('login').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('userBadge').textContent = currentUser.name + (currentUser.role === 'admin' ? ' 👑' : '');
+  document.body.classList.toggle('is-admin', currentUser.role === 'admin');
+  if (!db) initFirebase();
+  subscribeData();
+  subscribeUsers();
+  subscribePatients();
+  subscribeExpenses();
+}
+
+/* ============================================================
+   المزامنة المباشرة
+   ============================================================ */
+function subscribeData() {
+  if (!db) {
+    toast('⚠️ Firebase غير مُعدّ - راجع firebaseConfig');
+    return;
+  }
+  setConn(false);
+  unsubscribe = db.collection(COLLECTION)
+    .orderBy('createdAt', 'desc')
+    .onSnapshot(
+      (snap) => {
+        donations = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setConn(true);
+        renderAll();
+      },
+      (err) => {
+        console.error('Snapshot error:', err);
+        setConn(false);
+        toast('⚠️ خطأ في الاتصال');
+      }
+    );
+}
+
+function setConn(ok) {
+  const dot = document.getElementById('connDot');
+  dot.classList.toggle('online', ok);
+  dot.classList.toggle('offline', !ok);
+}
+
+function subscribeUsers() {
+  if (!db) return;
+  if (usersUnsubscribe) usersUnsubscribe();
+  usersUnsubscribe = db.collection(USERS_COLLECTION).onSnapshot(
+    (snap) => {
+      allMembers = {};
+      snap.docs.forEach(d => {
+        allMembers[d.id] = { username: d.id, ...d.data() };
+      });
+      renderMembers();
+      renderAdmin();
+    },
+    (err) => console.error('Users snapshot error:', err)
+  );
+}
+
+function getMemberName(username) {
+  if (!username) return '';
+  if (username === DEFAULT_ADMIN.username) return DEFAULT_ADMIN.name;
+  return (allMembers[username] || {}).name || username;
+}
+
+function subscribePatients() {
+  if (!db) return;
+  if (patientsUnsubscribe) patientsUnsubscribe();
+  patientsUnsubscribe = db.collection(PATIENTS_COLLECTION).onSnapshot(
+    (snap) => {
+      patients = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderPatients();
+      renderPatientChips();
+      renderAll();
+      // Re-render detail if open
+      if (currentPatientDetailId) {
+        const p = patients.find(x => x.id === currentPatientDetailId);
+        if (p) renderPatientDetail(currentPatientDetailId);
+      }
+    },
+    (err) => console.error('Patients snapshot error:', err)
+  );
+}
+
+function subscribeExpenses() {
+  if (!db) return;
+  if (expensesUnsubscribe) expensesUnsubscribe();
+  expensesUnsubscribe = db.collection(EXPENSES_COLLECTION).onSnapshot(
+    (snap) => {
+      expenses = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderPatients();
+      if (currentPatientDetailId) {
+        const p = patients.find(x => x.id === currentPatientDetailId);
+        if (p) renderPatientDetail(currentPatientDetailId);
+      }
+    },
+    (err) => console.error('Expenses snapshot error:', err)
+  );
+}
+
+/* ============================================================
+   حسابات الرصيد لكل مريض
+   ============================================================ */
+function patientStats(patientId) {
+  // كل تبرع له patientIds - يقسم المبلغ بالتساوي
+  let totalIn = 0;
+  const inDonations = [];
+  donations.forEach(d => {
+    if (d.status === 'cancelled') return;
+    if (Array.isArray(d.patientIds) && d.patientIds.includes(patientId)) {
+      const share = (d.amount || 0) / d.patientIds.length;
+      totalIn += share;
+      inDonations.push({ ...d, share });
+    }
+  });
+
+  // مصاريف هذا المريض
+  let totalOut = 0;
+  const patientExpenses = [];
+  expenses.forEach(e => {
+    if (e.patientId === patientId) {
+      totalOut += (e.amount || 0);
+      patientExpenses.push(e);
+    }
+  });
+
+  return {
+    totalIn,
+    totalOut,
+    balance: totalIn - totalOut,
+    inDonations,
+    expenses: patientExpenses
+  };
+}
+
+/* ============================================================
+   النموذج
+   ============================================================ */
+function toggleAnonymous(isAnon) {
+  anonymous = isAnon;
+  document.getElementById('tgNamed').classList.toggle('active', !isAnon);
+  document.getElementById('tgAnon').classList.toggle('active', isAnon);
+  document.getElementById('rowName').style.display = isAnon ? 'none' : 'block';
+  if (isAnon) document.getElementById('inpName').value = '';
+}
+
+function setStatus(s) {
+  statusChoice = s;
+  document.getElementById('stPending').classList.toggle('active', s === 'pending');
+  document.getElementById('stConfirmed').classList.toggle('active', s === 'confirmed');
+}
+
+function addDonation() {
+  const name = anonymous ? 'فاعل خير' : document.getElementById('inpName').value.trim();
+  const phone = document.getElementById('inpPhone').value.trim();
+  const via = document.getElementById('inpVia').value.trim();
+  const amount = parseFloat(document.getElementById('inpAmount').value) || 0;
+  let patientsCount = parseInt(document.getElementById('inpPatients').value) || 1;
+  const notes = document.getElementById('inpNotes').value.trim();
+  const patientIds = assignMode ? [...selectedPatientIds] : [];
+
+  if (!anonymous && !name) { alert('أدخل الاسم أو اختر "فاعل خير"'); return; }
+  if (amount <= 0) { alert('أدخل مبلغاً صحيحاً'); return; }
+  if (assignMode && patientIds.length === 0) { alert('اختر مريضاً واحداً على الأقل أو اختر "تبرع عام"'); return; }
+  if (assignMode) patientsCount = patientIds.length;
+
+  const btn = document.getElementById('btnAdd');
+  btn.disabled = true;
+  btn.textContent = '⏳ جاري الحفظ...';
+
+  const clearForm = () => {
+    if (!anonymous) document.getElementById('inpName').value = '';
+    document.getElementById('inpPhone').value = '';
+    document.getElementById('inpVia').value = '';
+    document.getElementById('inpAmount').value = '';
+    document.getElementById('inpPatients').value = '1';
+    document.getElementById('inpNotes').value = '';
+    setStatus('confirmed');
+    if (anonymous) toggleAnonymous(false);
+    selectedPatientIds = [];
+    toggleAssign(false);
+  };
+
+  const resetBtn = () => {
+    btn.textContent = '💾 حفظ التبرع';
+    btn.disabled = false;
+    btn.classList.remove('success');
+  };
+
+  const showSuccess = () => {
+    btn.textContent = '✓ تم الحفظ';
+    btn.classList.add('success');
+    toast('✓ تم حفظ التبرع');
+    setTimeout(resetBtn, 1200);
+  };
+
+  const showPending = () => {
+    btn.textContent = '✓ تم الحفظ';
+    btn.classList.add('success');
+    toast('📥 حُفظ محلياً - سيُزامن عند عودة الاتصال');
+    setTimeout(resetBtn, 1200);
+  };
+
+  let done = false;
+
+  db.collection(COLLECTION).add({
+    name, phone, via, amount,
+    patients: patientsCount,
+    patientIds,
+    notes,
+    status: statusChoice,
+    anonymous,
+    adminConfirmed: false,
+    addedBy: currentUser.username,
+    addedByName: currentUser.name,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(() => {
+    if (done) return;
+    done = true;
+    clearForm();
+    showSuccess();
+  }).catch((e) => {
+    if (done) return;
+    done = true;
+    console.error(e);
+    alert('فشل الحفظ: ' + e.message);
+    resetBtn();
+  });
+
+  setTimeout(() => {
+    if (done) return;
+    done = true;
+    clearForm();
+    showPending();
+  }, 2500);
+}
+
+/* ============================================================
+   العرض
+   ============================================================ */
+function renderAll() {
+  renderStats();
+  renderFeed();
+  renderFiles();
+  renderAdmin();
+}
+
+function renderStats() {
+  const active = donations.filter(d => d.status !== 'cancelled');
+  const total = active.reduce((s, d) => s + (d.amount || 0), 0);
+  const confirmed = donations.filter(d => d.status === 'confirmed').length;
+  const patients = active.reduce((s, d) => s + (d.patients || 1), 0);
+  pulseSet('statTotal', fmt(total));
+  pulseSet('statCount', donations.length);
+  pulseSet('statPatients', patients);
+  pulseSet('statConfirmed', confirmed);
+}
+
+function pulseSet(id, value) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const newVal = String(value);
+  if (el.textContent !== newVal) {
+    el.textContent = newVal;
+    el.classList.remove('updated');
+    void el.offsetWidth; // force reflow
+    el.classList.add('updated');
+  }
+}
+
+function statusLabel(s) {
+  return { confirmed: '✓ مؤكد', pending: '⏳ قيد المتابعة', cancelled: '✕ ملغى' }[s] || s;
+}
+function fmt(n) {
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(n || 0);
+}
+function fmtTime(ts) {
+  if (!ts) return '';
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+}
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+let seenDonationIds = new Set();
+let initialFeedDone = false;
+
+function buildDonationCard(d, isNew) {
+  const isAdmin = currentUser.role === 'admin';
+  const patientsTag = (Array.isArray(d.patientIds) && d.patientIds.length)
+    ? `<div class="dg-patients-tag">🏥 ${d.patientIds.map(pid => escapeHtml(getPatientName(pid))).join(' • ')}${d.patientIds.length > 1 ? ` (${fmt(d.amount / d.patientIds.length)}$ لكل)` : ''}</div>`
+    : '';
+  return `
+    <div class="dg-card ${d.status} ${d.adminConfirmed ? 'admin-confirmed' : ''} ${isNew ? 'is-new' : ''}">
+      ${d.adminConfirmed ? `<div class="dg-admin-badge">⭐ مؤكد المشرف</div>` : ''}
+      <div class="dg-amount">${fmt(d.amount)}<span class="dg-amount-currency"> $</span></div>
+      <div class="dg-name">${escapeHtml(d.name || 'فاعل خير')}</div>
+      ${patientsTag}
+      <div class="dg-meta">
+        ${d.phone ? `<div class="dg-meta-row">📞 ${escapeHtml(d.phone)}</div>` : ''}
+        ${d.via ? `<div class="dg-meta-row">🔗 ${escapeHtml(d.via)}</div>` : ''}
+        <div class="dg-meta-row">👥 ${d.patients || 1} مريض</div>
+        <div class="dg-meta-row">👤 ${escapeHtml(d.addedByName || '')} • 🕐 ${fmtTime(d.createdAt)}</div>
+      </div>
+      <div class="dg-status-pill ${d.status}">${statusLabel(d.status)}</div>
+      <div class="dg-actions">
+        ${isAdmin && !d.adminConfirmed ? `<button class="admin-confirm" onclick="adminConfirm('${d.id}')">⭐ تأكيد المشرف</button>` : ''}
+        ${isAdmin && d.adminConfirmed ? `<button class="admin-unconfirm" onclick="adminUnconfirm('${d.id}')">↩ إلغاء تأكيد المشرف</button>` : ''}
+        ${d.status !== 'confirmed' ? `<button class="confirm" onclick="updateStatus('${d.id}','confirmed')" title="تأكيد">✓</button>` : ''}
+        ${d.status !== 'pending' ? `<button class="pending" onclick="updateStatus('${d.id}','pending')" title="قيد المتابعة">⏳</button>` : ''}
+        ${d.status !== 'cancelled' ? `<button class="cancel" onclick="updateStatus('${d.id}','cancelled')" title="إلغاء">✕</button>` : ''}
+        <button class="edit" onclick="openEdit('${d.id}')" title="تعديل">✎</button>
+        ${isAdmin ? `<button class="del" onclick="deleteDonation('${d.id}')" title="حذف">🗑</button>` : ''}
+      </div>
+    </div>`;
+}
+
+function buildFeedSummary(filteredDonations) {
+  const active = filteredDonations.filter(d => d.status !== 'cancelled');
+  const total = active.reduce((s, d) => s + (d.amount || 0), 0);
+  const adminTotal = filteredDonations.filter(d => d.adminConfirmed && d.status !== 'cancelled').reduce((s, d) => s + (d.amount || 0), 0);
+  const adminCount = filteredDonations.filter(d => d.adminConfirmed).length;
+
+  // Unique donors
+  const donorKeys = new Set();
+  filteredDonations.forEach(d => {
+    if (d.status === 'cancelled') return;
+    if (d.phone && d.phone.trim()) donorKeys.add('p:' + d.phone.trim());
+    else if (d.anonymous) donorKeys.add('a:' + d.id);
+    else donorKeys.add('n:' + (d.name || '').trim().toLowerCase());
+  });
+
+  const avg = active.length ? total / active.length : 0;
+
+  return `
+    <div class="feed-summary">
+      <div class="feed-stat"><span class="v">${fmt(total)}</span><span class="l">💰 الإجمالي $</span></div>
+      <div class="feed-stat blue"><span class="v">${filteredDonations.length}</span><span class="l">📋 تبرعات</span></div>
+      <div class="feed-stat green"><span class="v">${donorKeys.size}</span><span class="l">👥 متبرع</span></div>
+      <div class="feed-stat gold"><span class="v">${fmt(adminTotal)}</span><span class="l">⭐ مؤكد المشرف $</span></div>
+    </div>`;
+}
+
+function buildPatientsMiniGrid() {
+  const active = patients.filter(p => (p.status || 'active') === 'active');
+  if (!active.length) return '';
+
+  // Global numbering by creation order
+  const globalOrder = [...patients].sort((a, b) => {
+    const ta = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
+    const tb = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
+    return ta - tb;
+  });
+  const numMap = {};
+  globalOrder.forEach((p, i) => { numMap[p.id] = i + 1; });
+
+  // Sort active by creation order
+  active.sort((a, b) => (numMap[a.id] || 0) - (numMap[b.id] || 0));
+
+  const cards = active.map(p => {
+    const stats = patientStats(p.id);
+    const target = p.targetAmount || 0;
+    const progress = target > 0 ? Math.min(100, (stats.totalIn / target) * 100) : 0;
+    const targetReached = target > 0 && stats.totalIn >= target;
+    // Unique donors for this patient
+    const dk = new Set();
+    stats.inDonations.forEach(d => {
+      if (d.phone && d.phone.trim()) dk.add('p:' + d.phone.trim());
+      else dk.add('n:' + (d.name || '').trim().toLowerCase() + ':' + d.id);
+    });
+
+    return `
+      <div class="pm-card ${targetReached ? 'target-reached' : ''}" onclick="openPatientDetail('${p.id}')">
+        <div class="pm-head">
+          <span class="pm-num">#${numMap[p.id]}</span>
+          <span class="pm-name">${escapeHtml(p.name)}</span>
+        </div>
+        <div class="pm-amount">${fmt(stats.totalIn)} $</div>
+        <div class="pm-info">
+          <span>🧾 ${dk.size} متبرع</span>
+          ${target > 0 ? `<span>${progress.toFixed(0)}%</span>` : `<span>صرف: ${fmt(stats.totalOut)}$</span>`}
+        </div>
+        ${target > 0 ? `<div class="pm-progress-bar"><div class="pm-progress-fill ${targetReached ? 'full' : ''}" style="width:${progress}%"></div></div>` : ''}
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="section-title">🏥 المرضى النشطون (${active.length})</div>
+    <div class="patients-mini-grid">${cards}</div>`;
+}
+
+function renderFeed() {
+  const list = document.getElementById('feedList');
+  const search = document.getElementById('srchFeed').value.trim().toLowerCase();
+  const filter = document.getElementById('filterFeed').value;
+
+  // Track new (animation)
+  if (!initialFeedDone) {
+    donations.forEach(d => seenDonationIds.add(d.id));
+    initialFeedDone = true;
+  }
+  const newIds = new Set();
+  donations.forEach(d => { if (!seenDonationIds.has(d.id)) newIds.add(d.id); });
+
+  // Apply status filter (admin filter no longer needed - section split shows it)
+  let filtered = donations;
+  if (filter === 'admin') filtered = filtered.filter(d => d.adminConfirmed);
+  else if (filter !== 'all') filtered = filtered.filter(d => d.status === filter);
+  if (search) {
+    filtered = filtered.filter(d =>
+      (d.name || '').toLowerCase().includes(search) ||
+      (d.phone || '').includes(search) ||
+      (d.via || '').toLowerCase().includes(search)
+    );
+  }
+
+  // Build output
+  let html = '';
+
+  // Summary (based on full donations, not just filtered, so user sees big picture)
+  html += buildFeedSummary(donations);
+
+  // Patients mini grid (always shown if any active)
+  html += buildPatientsMiniGrid();
+
+  // Split donations into two sections
+  const adminConfirmedList = filtered.filter(d => d.adminConfirmed);
+  const notConfirmedList = filtered.filter(d => !d.adminConfirmed);
+
+  if (!filtered.length) {
+    html += '<div class="empty"><div class="empty-icon">📋</div>لا توجد تبرعات بعد<br><small>ستظهر هنا فور إدخالها</small></div>';
+  } else {
+    if (adminConfirmedList.length) {
+      const adminTotal = adminConfirmedList.filter(d => d.status !== 'cancelled').reduce((s, d) => s + (d.amount || 0), 0);
+      html += `
+        <div class="feed-section-head admin-section">
+          <span>⭐ مؤكد من المشرف</span>
+          <span class="count">${adminConfirmedList.length} • ${fmt(adminTotal)} $</span>
+        </div>
+        <div class="donations-grid">${adminConfirmedList.map(d => buildDonationCard(d, newIds.has(d.id))).join('')}</div>`;
+    }
+    if (notConfirmedList.length) {
+      const notTotal = notConfirmedList.filter(d => d.status !== 'cancelled').reduce((s, d) => s + (d.amount || 0), 0);
+      html += `
+        <div class="feed-section-head normal-section">
+          <span>📋 غير مؤكد من المشرف</span>
+          <span class="count">${notConfirmedList.length} • ${fmt(notTotal)} $</span>
+        </div>
+        <div class="donations-grid">${notConfirmedList.map(d => buildDonationCard(d, newIds.has(d.id))).join('')}</div>`;
+    }
+  }
+
+  list.innerHTML = html;
+
+  // Mark seen
+  donations.forEach(d => seenDonationIds.add(d.id));
+}
+
+function donorKey(d) {
+  if (d.phone && d.phone.trim()) return 'p:' + d.phone.trim();
+  if (d.anonymous) return 'a:' + d.id;
+  return 'n:' + (d.name || '').trim().toLowerCase();
+}
+
+function renderFiles() {
+  const list = document.getElementById('filesList');
+  const search = document.getElementById('srchFiles').value.trim().toLowerCase();
+
+  const groups = {};
+  donations.forEach(d => {
+    const k = donorKey(d);
+    if (!groups[k]) groups[k] = { name: d.name || 'فاعل خير', phone: d.phone || '', items: [] };
+    groups[k].items.push(d);
+    if (!groups[k].name || groups[k].name === 'فاعل خير') groups[k].name = d.name || groups[k].name;
+    if (!groups[k].phone) groups[k].phone = d.phone || '';
+  });
+
+  let entries = Object.entries(groups).map(([k, g]) => ({
+    key: k,
+    name: g.name,
+    phone: g.phone,
+    total: g.items.filter(x => x.status !== 'cancelled').reduce((s, x) => s + (x.amount || 0), 0),
+    count: g.items.length,
+    patients: g.items.filter(x => x.status !== 'cancelled').reduce((s, x) => s + (x.patients || 1), 0),
+    items: g.items
+  }));
+
+  if (search) {
+    entries = entries.filter(e =>
+      (e.name || '').toLowerCase().includes(search) ||
+      (e.phone || '').includes(search)
+    );
+  }
+  entries.sort((a, b) => b.total - a.total);
+
+  donorGroups = Object.fromEntries(entries.map(e => [e.key, e]));
+
+  if (!entries.length) {
+    list.innerHTML = '<div class="empty">لا توجد ملفات</div>';
+    return;
+  }
+
+  list.innerHTML = entries.map(e => `
+    <div class="donor-card" onclick="openDonor('${e.key.replace(/'/g, "\\'")}')">
+      <div class="donor-head">
+        <div class="donor-name">${escapeHtml(e.name)}</div>
+        <div class="donor-total">${fmt(e.total)} $</div>
+      </div>
+      <div class="donor-sub">
+        ${e.phone ? `<span>📞 ${escapeHtml(e.phone)}</span>` : ''}
+        <span>🧾 ${e.count} تبرع</span>
+        <span>👥 ${e.patients} مريض</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openDonor(key) {
+  const e = donorGroups[key];
+  if (!e) return;
+  document.getElementById('donorTitle').textContent = '👤 ' + e.name;
+  const items = [...e.items].sort((a, b) => {
+    const ta = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
+    const tb = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
+    return tb - ta;
+  });
+  const html = `
+    <div style="background:#eef4f7;padding:10px;border-radius:8px;margin-bottom:12px;font-size:13px;line-height:1.8">
+      ${e.phone ? `<div>📞 الهاتف: <b>${escapeHtml(e.phone)}</b></div>` : ''}
+      <div>💰 الإجمالي: <b style="color:#16a34a">${fmt(e.total)} $</b></div>
+      <div>🧾 عدد التبرعات: <b>${e.count}</b></div>
+      <div>👥 إجمالي المرضى: <b>${e.patients}</b></div>
+    </div>
+    ${items.map(d => `
+      <div class="donation-card ${d.status}" style="margin-bottom:8px">
+        <div class="donation-head">
+          <div class="donation-amount">${fmt(d.amount)} $</div>
+          <div style="font-size:12px;color:#777">${statusLabel(d.status)}</div>
+        </div>
+        <div class="donation-meta">
+          <span>👥 ${d.patients || 1} مريض</span>
+          ${d.via ? `<span>🔗 ${escapeHtml(d.via)}</span>` : ''}
+          <span>👤 ${escapeHtml(d.addedByName || '')}</span>
+          <span>🕐 ${fmtTime(d.createdAt)}</span>
+        </div>
+        ${d.notes ? `<div class="donation-notes">📝 ${escapeHtml(d.notes)}</div>` : ''}
+      </div>
+    `).join('')}
+  `;
+  document.getElementById('donorContent').innerHTML = html;
+  document.getElementById('donorModal').classList.remove('hidden');
+}
+
+function closeDonor() {
+  document.getElementById('donorModal').classList.add('hidden');
+}
+
+function renderAdmin() {
+  const active = donations.filter(d => d.status !== 'cancelled');
+  const total = active.reduce((s, d) => s + (d.amount || 0), 0);
+  const confirmedAmt = donations.filter(d => d.status === 'confirmed').reduce((s, d) => s + (d.amount || 0), 0);
+  const adminConfirmedAmt = donations.filter(d => d.adminConfirmed && d.status !== 'cancelled').reduce((s, d) => s + (d.amount || 0), 0);
+  const pendingAmt = donations.filter(d => d.status === 'pending').reduce((s, d) => s + (d.amount || 0), 0);
+  const patients = active.reduce((s, d) => s + (d.patients || 1), 0);
+
+  const uniqueKeys = new Set();
+  donations.forEach(d => uniqueKeys.add(donorKey(d)));
+
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  const todayCount = donations.filter(d => {
+    if (!d.createdAt || !d.createdAt.toMillis) return false;
+    return d.createdAt.toMillis() >= todayStart.getTime();
+  }).length;
+
+  document.getElementById('admTotal').textContent = fmt(total);
+  document.getElementById('admConfirmedAmt').textContent = fmt(confirmedAmt);
+  document.getElementById('admAdminConfirmedAmt').textContent = fmt(adminConfirmedAmt);
+  document.getElementById('admPendingAmt').textContent = fmt(pendingAmt);
+  document.getElementById('admDonors').textContent = uniqueKeys.size;
+  document.getElementById('admPatients').textContent = patients;
+  document.getElementById('admToday').textContent = todayCount;
+
+  const sel = document.getElementById('filterAdmin');
+  const members = [...new Set(donations.map(d => d.addedBy).filter(Boolean))];
+  const prev = sel.value;
+  sel.innerHTML = '<option value="all">كل المسؤولين</option>' +
+    members.map(m => `<option value="${m}">${escapeHtml(getMemberName(m))}</option>`).join('');
+  sel.value = members.includes(prev) ? prev : 'all';
+
+  const search = document.getElementById('srchAdmin').value.trim().toLowerCase();
+  const member = sel.value;
+  let filtered = donations;
+  if (member !== 'all') filtered = filtered.filter(d => d.addedBy === member);
+  if (search) {
+    filtered = filtered.filter(d =>
+      (d.name || '').toLowerCase().includes(search) ||
+      (d.phone || '').includes(search) ||
+      getMemberName(d.addedBy).toLowerCase().includes(search)
+    );
+  }
+
+  const list = document.getElementById('adminList');
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty">لا توجد سجلات</div>';
+    return;
+  }
+
+  const byMember = {};
+  filtered.forEach(d => {
+    const k = d.addedBy || '?';
+    if (!byMember[k]) byMember[k] = [];
+    byMember[k].push(d);
+  });
+
+  list.innerHTML = Object.entries(byMember).map(([m, items]) => {
+    const mt = items.filter(x => x.status !== 'cancelled').reduce((s, x) => s + (x.amount || 0), 0);
+    const mp = items.filter(x => x.status !== 'cancelled').reduce((s, x) => s + (x.patients || 1), 0);
+    return `
+      <div class="member-header">
+        <span>👤 ${escapeHtml(getMemberName(m))} • ${items.length} تبرع • ${mp} مريض</span>
+        <span>${fmt(mt)} $</span>
+      </div>
+      ${items.map(d => `
+        <div class="donation-card ${d.status} ${d.adminConfirmed ? 'admin-confirmed' : ''}">
+          ${d.adminConfirmed ? `<div class="admin-badge">⭐ مؤكد من المشرف</div>` : ''}
+          <div class="donation-head">
+            <div class="donation-name">${escapeHtml(d.name || 'فاعل خير')}</div>
+            <div class="donation-amount">${fmt(d.amount)} $</div>
+          </div>
+          <div class="donation-meta">
+            ${d.phone ? `<span>📞 ${escapeHtml(d.phone)}</span>` : ''}
+            ${d.via ? `<span>🔗 ${escapeHtml(d.via)}</span>` : ''}
+            <span>👥 ${d.patients || 1}</span>
+            <span>${statusLabel(d.status)}</span>
+            <span>🕐 ${fmtTime(d.createdAt)}</span>
+          </div>
+          ${d.notes ? `<div class="donation-notes">📝 ${escapeHtml(d.notes)}</div>` : ''}
+          <div class="donation-actions">
+            ${currentUser.role === 'admin' && !d.adminConfirmed ? `<button class="admin-confirm" onclick="adminConfirm('${d.id}')">⭐ تأكيد المشرف</button>` : ''}
+            ${currentUser.role === 'admin' && d.adminConfirmed ? `<button class="admin-unconfirm" onclick="adminUnconfirm('${d.id}')">↩ إلغاء تأكيد المشرف</button>` : ''}
+            <button class="edit" onclick="openEdit('${d.id}')">✎ تعديل</button>
+            ${currentUser.role === 'admin' ? `<button class="del" onclick="deleteDonation('${d.id}')">🗑 حذف</button>` : ''}
+          </div>
+        </div>
+      `).join('')}
+    `;
+  }).join('');
+}
+
+/* ============================================================
+   إجراءات
+   ============================================================ */
+async function updateStatus(id, status) {
+  try {
+    await db.collection(COLLECTION).doc(id).update({
+      status,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedBy: currentUser.username
+    });
+    toast('✓ تم التحديث');
+  } catch (e) { alert('فشل التحديث: ' + e.message); }
+}
+
+async function adminConfirm(id) {
+  if (currentUser.role !== 'admin') { alert('للمشرف فقط'); return; }
+  try {
+    await db.collection(COLLECTION).doc(id).update({
+      adminConfirmed: true,
+      adminConfirmedBy: currentUser.username,
+      adminConfirmedByName: currentUser.name,
+      adminConfirmedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      status: 'confirmed'
+    });
+    toast('⭐ تم تأكيد المشرف');
+  } catch (e) { alert('فشل: ' + e.message); }
+}
+
+async function adminUnconfirm(id) {
+  if (currentUser.role !== 'admin') { alert('للمشرف فقط'); return; }
+  if (!confirm('إلغاء تأكيد المشرف لهذا التبرع؟')) return;
+  try {
+    await db.collection(COLLECTION).doc(id).update({
+      adminConfirmed: false,
+      adminUnconfirmedBy: currentUser.username,
+      adminUnconfirmedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    toast('↩ تم إلغاء تأكيد المشرف');
+  } catch (e) { alert('فشل: ' + e.message); }
+}
+
+async function deleteDonation(id) {
+  if (currentUser.role !== 'admin') { alert('للمشرف فقط'); return; }
+  if (!confirm('هل تريد حذف هذا التبرع نهائياً؟')) return;
+  try {
+    await db.collection(COLLECTION).doc(id).delete();
+    toast('🗑 تم الحذف');
+  } catch (e) { alert('فشل الحذف: ' + e.message); }
+}
+
+function openEdit(id) {
+  const d = donations.find(x => x.id === id);
+  if (!d) return;
+  editingId = id;
+  document.getElementById('edName').value = d.name || '';
+  document.getElementById('edPhone').value = d.phone || '';
+  document.getElementById('edVia').value = d.via || '';
+  document.getElementById('edAmount').value = d.amount || 0;
+  document.getElementById('edPatients').value = d.patients || 1;
+  document.getElementById('edStatus').value = d.status || 'confirmed';
+  document.getElementById('edNotes').value = d.notes || '';
+  document.getElementById('editModal').classList.remove('hidden');
+}
+
+function closeEdit() {
+  editingId = null;
+  document.getElementById('editModal').classList.add('hidden');
+}
+
+function saveEdit() {
+  if (!editingId) return;
+  const id = editingId;
+  const data = {
+    name: document.getElementById('edName').value.trim() || 'فاعل خير',
+    phone: document.getElementById('edPhone').value.trim(),
+    via: document.getElementById('edVia').value.trim(),
+    amount: parseFloat(document.getElementById('edAmount').value) || 0,
+    patients: parseInt(document.getElementById('edPatients').value) || 1,
+    status: document.getElementById('edStatus').value,
+    notes: document.getElementById('edNotes').value.trim(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedBy: currentUser.username
+  };
+  closeEdit();
+  toast('⏳ جاري الحفظ...');
+  let done = false;
+  db.collection(COLLECTION).doc(id).update(data).then(() => {
+    if (done) return; done = true;
+    toast('✓ تم الحفظ');
+  }).catch((e) => {
+    if (done) return; done = true;
+    handleDbError(e, 'فشل الحفظ');
+  });
+  setTimeout(() => { if (done) return; done = true; toast('✓ تم'); }, 2500);
+}
+
+/* ============================================================
+   إدارة المرضى
+   ============================================================ */
+function renderPatients() {
+  const list = document.getElementById('patientsList');
+  if (!list) return;
+  const search = (document.getElementById('srchPatients')?.value || '').trim().toLowerCase();
+  const filter = document.getElementById('filterPatients')?.value || 'active';
+
+  let filtered = [...patients];
+  if (filter !== 'all') filtered = filtered.filter(p => (p.status || 'active') === filter);
+  if (search) {
+    filtered = filtered.filter(p =>
+      (p.name || '').toLowerCase().includes(search) ||
+      (p.condition || '').toLowerCase().includes(search)
+    );
+  }
+
+  // Sort by status then created
+  filtered.sort((a, b) => {
+    const sa = a.status || 'active';
+    const sb = b.status || 'active';
+    if (sa !== sb) {
+      const order = { active: 0, completed: 1, closed: 2 };
+      return (order[sa] || 9) - (order[sb] || 9);
+    }
+    const ta = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
+    const tb = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
+    return ta - tb; // older first to keep numbering stable
+  });
+
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty">لا توجد ملفات مرضى<br><small>اضغط "فتح ملف مريض جديد" للبدء</small></div>';
+    return;
+  }
+
+  // Compute global numbering (by creation order across ALL patients)
+  const globalOrder = [...patients].sort((a, b) => {
+    const ta = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
+    const tb = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
+    return ta - tb;
+  });
+  const numMap = {};
+  globalOrder.forEach((p, i) => { numMap[p.id] = i + 1; });
+
+  // Group by status for display
+  const groups = { active: [], completed: [], closed: [] };
+  filtered.forEach(p => groups[p.status || 'active'].push(p));
+
+  let html = '';
+
+  if (groups.active.length) {
+    html += `<div class="section-title">⚡ نشط (${groups.active.length})</div>`;
+    html += '<div class="patients-grid">' + groups.active.map(p => patientGridCard(p, numMap[p.id])).join('') + '</div>';
+  }
+  if (groups.completed.length) {
+    html += `<div class="section-title">✓ مكتمل (${groups.completed.length})</div>`;
+    html += '<div class="patients-grid">' + groups.completed.map(p => patientGridCard(p, numMap[p.id])).join('') + '</div>';
+  }
+  if (groups.closed.length) {
+    html += `<div class="section-title">🔒 مغلق (${groups.closed.length})</div>`;
+    html += '<div class="patients-grid">' + groups.closed.map(p => patientGridCard(p, numMap[p.id])).join('') + '</div>';
+  }
+
+  list.innerHTML = html;
+}
+
+function patientGridCard(p, num) {
+  const stats = patientStats(p.id);
+  const status = p.status || 'active';
+  const target = p.targetAmount || 0;
+  const progress = target > 0 ? Math.min(100, (stats.totalIn / target) * 100) : 0;
+  const targetReached = target > 0 && stats.totalIn >= target;
+  const isNeg = stats.balance < 0;
+  const remaining = target > 0 ? Math.max(0, target - stats.totalIn) : null;
+
+  return `
+    <div class="pg-card ${status}" onclick="openPatientDetail('${p.id}')">
+      <div class="pg-top">
+        <span class="patient-status-tag tag-${status}">
+          ${status === 'active' ? '⚡ نشط' : status === 'completed' ? '✓ مكتمل' : '🔒 مغلق'}
+        </span>
+        <span class="pg-num">#${num}</span>
+      </div>
+      <div class="pg-name">${escapeHtml(p.name)}</div>
+      <div class="pg-cond">${escapeHtml(p.condition || ' ')}</div>
+
+      <div class="pg-stats">
+        <div class="pg-row"><span>⬆️ جُمع</span><b class="bal-in">${fmt(stats.totalIn)} $</b></div>
+        <div class="pg-row"><span>⬇️ صرف</span><b class="bal-out">${fmt(stats.totalOut)} $</b></div>
+        ${target > 0 ? `
+          <div class="pg-row big"><span>${targetReached ? '✓ تم الهدف' : 'متبقي للهدف'}</span><b class="${targetReached ? 'bal-in' : 'bal-net'}">${fmt(remaining)} $</b></div>
+        ` : `
+          <div class="pg-row big"><span>💰 الرصيد</span><b class="bal-net ${isNeg ? 'negative' : ''}">${fmt(stats.balance)} $</b></div>
+        `}
+      </div>
+
+      ${target > 0 ? `
+        <div class="pg-progress">
+          <div class="pg-progress-info">
+            <span>هدف: ${fmt(target)} $</span>
+            <span>${progress.toFixed(0)}%</span>
+          </div>
+          <div class="pg-progress-bar"><div class="pg-progress-fill ${targetReached ? 'full' : ''}" style="width:${progress}%"></div></div>
+        </div>
+      ` : ''}
+
+      ${status === 'active' ? `
+        <button class="pg-complete-btn ${targetReached ? 'target-reached' : ''}" onclick="event.stopPropagation();markPatientComplete('${p.id}')">
+          ${targetReached ? '🎉 الهدف وصل - أكمل الآن' : '✓ ضع علامة اكتمل'}
+        </button>
+      ` : status === 'completed' ? `
+        <button class="pg-reopen-btn" onclick="event.stopPropagation();reopenPatient('${p.id}')">↩ إعادة فتح</button>
+      ` : `
+        <button class="pg-reopen-btn" onclick="event.stopPropagation();reopenPatient('${p.id}')">↩ إعادة فتح</button>
+      `}
+    </div>
+  `;
+}
+
+async function markPatientComplete(id) {
+  const p = patients.find(x => x.id === id);
+  if (!p) return;
+  const stats = patientStats(id);
+  let msg = `وضع علامة "مكتمل" على ملف "${p.name}"؟`;
+  if (p.targetAmount > 0 && stats.totalIn < p.targetAmount) {
+    msg += `\n⚠️ المبلغ المجموع (${fmt(stats.totalIn)}) أقل من الهدف (${fmt(p.targetAmount)})`;
+  }
+  if (!confirm(msg)) return;
+  try {
+    await db.collection(PATIENTS_COLLECTION).doc(id).update({
+      status: 'completed',
+      completedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      completedBy: currentUser.username,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedBy: currentUser.username
+    });
+    toast('🎉 تم وضع علامة مكتمل');
+  } catch (e) { handleDbError(e, 'فشل التحديث'); }
+}
+
+async function reopenPatient(id) {
+  if (!confirm('إعادة فتح هذا الملف؟')) return;
+  try {
+    await db.collection(PATIENTS_COLLECTION).doc(id).update({
+      status: 'active',
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedBy: currentUser.username
+    });
+    toast('↩ تمت إعادة الفتح');
+  } catch (e) { handleDbError(e, 'فشل التحديث'); }
+}
+
+function renderPatientChips() {
+  const container = document.getElementById('patientChips');
+  if (!container) return;
+  const active = patients.filter(p => (p.status || 'active') === 'active');
+  if (!active.length) {
+    container.innerHTML = '<div class="patient-chip-empty">لا يوجد مرضى نشطين. افتح ملف مريض أولاً من تبويب المرضى.</div>';
+    return;
+  }
+  container.innerHTML = active.map(p => `
+    <button type="button" class="patient-chip ${selectedPatientIds.includes(p.id) ? 'selected' : ''}" onclick="togglePatientChip('${p.id}')">${escapeHtml(p.name)}</button>
+  `).join('');
+}
+
+function togglePatientChip(id) {
+  const idx = selectedPatientIds.indexOf(id);
+  if (idx >= 0) selectedPatientIds.splice(idx, 1);
+  else selectedPatientIds.push(id);
+  renderPatientChips();
+  updateSplitPreview();
+}
+
+function updateSplitPreview() {
+  const preview = document.getElementById('splitPreview');
+  const amount = parseFloat(document.getElementById('inpAmount').value) || 0;
+  if (assignMode && selectedPatientIds.length > 0 && amount > 0) {
+    const share = amount / selectedPatientIds.length;
+    preview.textContent = `💡 ${fmt(share)} $ لكل مريض × ${selectedPatientIds.length} = ${fmt(amount)} $`;
+  } else {
+    preview.textContent = '';
+  }
+  // Sync patient count input
+  if (assignMode && selectedPatientIds.length > 0) {
+    document.getElementById('inpPatients').value = selectedPatientIds.length;
+  }
+}
+
+function toggleAssign(specific) {
+  assignMode = specific;
+  document.getElementById('tgGeneral').classList.toggle('active', !specific);
+  document.getElementById('tgSpecific').classList.toggle('active', specific);
+  document.getElementById('rowPatientChips').style.display = specific ? 'block' : 'none';
+  document.getElementById('inpPatients').disabled = specific;
+  if (!specific) selectedPatientIds = [];
+  renderPatientChips();
+  updateSplitPreview();
+}
+
+function openAddPatient() {
+  editingPatientId = null;
+  document.getElementById('patientModalTitle').textContent = '➕ فتح ملف مريض جديد';
+  document.getElementById('ptName').value = '';
+  document.getElementById('ptCondition').value = '';
+  document.getElementById('ptTarget').value = '';
+  document.getElementById('ptStatus').value = 'active';
+  document.getElementById('ptNotes').value = '';
+  document.getElementById('patientModal').classList.remove('hidden');
+}
+
+function openEditPatient(id) {
+  const p = patients.find(x => x.id === id);
+  if (!p) return;
+  editingPatientId = id;
+  document.getElementById('patientModalTitle').textContent = '✎ تعديل ملف المريض';
+  document.getElementById('ptName').value = p.name || '';
+  document.getElementById('ptCondition').value = p.condition || '';
+  document.getElementById('ptTarget').value = p.targetAmount || '';
+  document.getElementById('ptStatus').value = p.status || 'active';
+  document.getElementById('ptNotes').value = p.notes || '';
+  document.getElementById('patientModal').classList.remove('hidden');
+}
+
+function closePatient() {
+  editingPatientId = null;
+  document.getElementById('patientModal').classList.add('hidden');
+}
+
+function savePatient() {
+  const name = document.getElementById('ptName').value.trim();
+  const condition = document.getElementById('ptCondition').value.trim();
+  const targetAmount = parseFloat(document.getElementById('ptTarget').value) || 0;
+  const status = document.getElementById('ptStatus').value;
+  const notes = document.getElementById('ptNotes').value.trim();
+
+  if (!name) { alert('أدخل اسم المريض'); return; }
+
+  const isNew = !editingPatientId;
+  const targetId = editingPatientId;
+  closePatient();
+  toast('⏳ جاري الحفظ...');
+
+  const promise = isNew
+    ? db.collection(PATIENTS_COLLECTION).add({
+        name, condition, targetAmount, status, notes,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        createdBy: currentUser.username,
+        createdByName: currentUser.name
+      })
+    : db.collection(PATIENTS_COLLECTION).doc(targetId).update({
+        name, condition, targetAmount, status, notes,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedBy: currentUser.username
+      });
+
+  let done = false;
+  promise.then(() => {
+    if (done) return;
+    done = true;
+    toast(isNew ? '✓ تم فتح الملف' : '✓ تم التحديث');
+  }).catch((e) => {
+    if (done) return;
+    done = true;
+    handleDbError(e, 'فشل الحفظ');
+  });
+
+  setTimeout(() => {
+    if (done) return;
+    done = true;
+    toast(isNew ? '✓ تم فتح الملف' : '✓ تم التحديث');
+  }, 2500);
+}
+
+async function deletePatient(id) {
+  if (currentUser.role !== 'admin') { alert('للمشرف فقط'); return; }
+  const p = patients.find(x => x.id === id);
+  if (!p) return;
+  const stats = patientStats(id);
+  let msg = `حذف ملف "${p.name}" نهائياً؟`;
+  if (stats.inDonations.length || stats.expenses.length) {
+    msg += `\n⚠️ هذا الملف فيه ${stats.inDonations.length} تبرع و ${stats.expenses.length} دفعة`;
+  }
+  if (!confirm(msg)) return;
+  try {
+    // Delete expenses linked
+    const batch = db.batch();
+    expenses.filter(e => e.patientId === id).forEach(e => {
+      batch.delete(db.collection(EXPENSES_COLLECTION).doc(e.id));
+    });
+    batch.delete(db.collection(PATIENTS_COLLECTION).doc(id));
+    await batch.commit();
+    toast('🗑 تم الحذف');
+    closePatientDetail();
+  } catch (e) { handleDbError(e, 'فشل الحذف'); }
+}
+
+function openPatientDetail(id) {
+  currentPatientDetailId = id;
+  renderPatientDetail(id);
+  document.getElementById('patientDetailModal').classList.remove('hidden');
+  document.getElementById('pdPdfBtn').onclick = () => generatePatientReport(id);
+}
+
+function closePatientDetail() {
+  currentPatientDetailId = null;
+  document.getElementById('patientDetailModal').classList.add('hidden');
+}
+
+function renderPatientDetail(id) {
+  const p = patients.find(x => x.id === id);
+  if (!p) { closePatientDetail(); return; }
+  const stats = patientStats(id);
+  const status = p.status || 'active';
+  const target = p.targetAmount || 0;
+  const progress = target > 0 ? Math.min(100, (stats.totalIn / target) * 100) : 0;
+  const isAdmin = currentUser.role === 'admin';
+  const isNeg = stats.balance < 0;
+
+  document.getElementById('pdTitle').textContent = '🏥 ' + p.name;
+
+  // Sort movements by date desc - mix donations and expenses
+  const movements = [
+    ...stats.inDonations.map(d => ({ kind: 'in', t: d.createdAt, ...d })),
+    ...stats.expenses.map(e => ({ kind: 'out', t: e.paidAt || e.createdAt, ...e }))
+  ].sort((a, b) => {
+    const ta = a.t && a.t.toMillis ? a.t.toMillis() : 0;
+    const tb = b.t && b.t.toMillis ? b.t.toMillis() : 0;
+    return tb - ta;
+  });
+
+  document.getElementById('pdContent').innerHTML = `
+    <div style="background:#eef4f7;padding:12px;border-radius:8px;margin-bottom:12px;font-size:13px;line-height:1.7">
+      <div><b>الحالة:</b> <span class="patient-status-tag tag-${status}">${status === 'active' ? 'نشط' : status === 'completed' ? 'مكتمل' : 'مغلق'}</span></div>
+      ${p.condition ? `<div><b>التفاصيل:</b> ${escapeHtml(p.condition)}</div>` : ''}
+      ${target > 0 ? `<div><b>المبلغ المطلوب:</b> ${fmt(target)} $</div>` : ''}
+      ${p.notes ? `<div><b>ملاحظات:</b> ${escapeHtml(p.notes)}</div>` : ''}
+    </div>
+
+    <div class="balance-row">
+      <div class="balance-cell"><div class="v bal-in">${fmt(stats.totalIn)}</div><div class="l">إجمالي الدخل $</div></div>
+      <div class="balance-cell"><div class="v bal-out">${fmt(stats.totalOut)}</div><div class="l">إجمالي الصرف $</div></div>
+      <div class="balance-cell"><div class="v bal-net ${isNeg ? 'negative' : ''}">${fmt(stats.balance)}</div><div class="l">الرصيد $</div></div>
+    </div>
+
+    ${target > 0 ? `
+      <div style="font-size:12px;color:#777;display:flex;justify-content:space-between;margin-top:8px">
+        <span>التقدّم: ${progress.toFixed(0)}%</span>
+        <span>${fmt(stats.totalIn)} / ${fmt(target)} $</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${progress}%"></div></div>
+    ` : ''}
+
+    <div style="display:flex;gap:6px;margin-top:14px;flex-wrap:wrap">
+      <button class="btn-submit" style="flex:1;padding:10px" onclick="openAddExpense('${id}')">💸 تسجيل دفعة</button>
+      <button class="btn-submit" style="flex:1;padding:10px;background:#6b7280" onclick="openEditPatient('${id}');closePatientDetail()">✎ تعديل</button>
+      ${isAdmin ? `<button class="btn-submit" style="flex:0 0 auto;padding:10px 14px;background:#dc2626" onclick="deletePatient('${id}')">🗑</button>` : ''}
+    </div>
+
+    <h3 style="margin:14px 0 8px;font-size:14px;color:#2c5364">📜 سجل الحركات (${movements.length})</h3>
+    ${movements.length === 0 ? '<div class="empty">لا توجد حركات بعد</div>' : movements.map(m => {
+      if (m.kind === 'in') {
+        return `
+          <div class="expense-card donation-in">
+            <div class="expense-head">
+              <div class="expense-desc">⬆️ ${escapeHtml(m.name || 'فاعل خير')}</div>
+              <div class="expense-amount" style="color:#16a34a">+${fmt(m.share)} $</div>
+            </div>
+            <div class="expense-meta">
+              <span>أصل التبرع: ${fmt(m.amount)} $ ${m.patientIds && m.patientIds.length > 1 ? `(لـ ${m.patientIds.length} مرضى)` : ''}</span>
+              ${m.phone ? `<span>📞 ${escapeHtml(m.phone)}</span>` : ''}
+              <span>👤 ${escapeHtml(m.addedByName || '')}</span>
+              <span>🕐 ${fmtTime(m.t)}</span>
+              ${m.adminConfirmed ? '<span style="color:#d97706">⭐ مؤكد</span>' : ''}
+            </div>
+          </div>
+        `;
+      } else {
+        return `
+          <div class="expense-card">
+            <div class="expense-head">
+              <div class="expense-desc">⬇️ ${escapeHtml(m.description || 'دفعة')}</div>
+              <div class="expense-amount" style="color:#dc2626">-${fmt(m.amount)} $</div>
+            </div>
+            <div class="expense-meta">
+              <span>👤 ${escapeHtml(m.paidByName || '')}</span>
+              <span>🕐 ${fmtTime(m.t)}</span>
+            </div>
+            ${m.notes ? `<div style="font-size:12px;color:#555;margin-top:4px">📝 ${escapeHtml(m.notes)}</div>` : ''}
+            ${m.invoiceUrl ? `<img class="invoice-thumb" src="${escapeHtml(m.invoiceUrl)}" onclick="event.stopPropagation();showImg('${escapeHtml(m.invoiceUrl)}')">` : ''}
+            ${isAdmin || m.paidBy === currentUser.username ? `
+              <div style="margin-top:6px;display:flex;gap:4px">
+                <button onclick="deleteExpense('${m.id}')" style="padding:4px 10px;background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;font-size:11px;cursor:pointer;color:#7f1d1d;font-family:inherit">🗑 حذف</button>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }
+    }).join('')}
+  `;
+}
+
+/* ============================================================
+   المصاريف / الفواتير
+   ============================================================ */
+function openAddExpense(patientId) {
+  editingExpenseId = null;
+  pendingExpenseImage = null;
+  const p = patients.find(x => x.id === patientId);
+  if (!p) return;
+  document.getElementById('expModalTitle').textContent = '💸 دفعة لـ ' + p.name;
+  document.getElementById('expPatient').value = p.name;
+  document.getElementById('expPatient').dataset.patientId = patientId;
+  document.getElementById('expAmount').value = '';
+  document.getElementById('expDesc').value = '';
+  document.getElementById('expNotes').value = '';
+  document.getElementById('expImage').value = '';
+  document.getElementById('expImagePreview').innerHTML = '';
+  document.getElementById('expenseModal').classList.remove('hidden');
+}
+
+function closeExpense() {
+  editingExpenseId = null;
+  pendingExpenseImage = null;
+  document.getElementById('expenseModal').classList.add('hidden');
+}
+
+// Image preview when user picks a file
+function setupExpenseImageListener() {
+  const imgInp = document.getElementById('expImage');
+  if (!imgInp) return;
+  imgInp.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) { pendingExpenseImage = null; document.getElementById('expImagePreview').innerHTML = ''; return; }
+    try {
+      const compressed = await compressImage(file, 1200, 0.8);
+      pendingExpenseImage = { file, dataUrl: compressed };
+      document.getElementById('expImagePreview').innerHTML = `<img src="${compressed}" style="max-width:120px;max-height:120px;border-radius:6px;border:1px solid #ddd">`;
+    } catch (err) {
+      console.error(err);
+      alert('فشل معالجة الصورة');
+    }
+  });
+}
+
+async function compressImage(file, maxDim = 1200, quality = 0.8) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) { height = height * (maxDim / width); width = maxDim; }
+          else { width = width * (maxDim / height); height = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadToCloudinary(dataUrl) {
+  if (!CLOUDINARY_CONFIG.cloudName || !CLOUDINARY_CONFIG.uploadPreset) return null;
+  const blob = await (await fetch(dataUrl)).blob();
+  const fd = new FormData();
+  fd.append('file', blob);
+  fd.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload`, {
+    method: 'POST', body: fd
+  });
+  if (!res.ok) throw new Error('فشل رفع الصورة');
+  const data = await res.json();
+  return data.secure_url;
+}
+
+async function saveExpense() {
+  const patientId = document.getElementById('expPatient').dataset.patientId;
+  const amount = parseFloat(document.getElementById('expAmount').value) || 0;
+  const description = document.getElementById('expDesc').value.trim();
+  const notes = document.getElementById('expNotes').value.trim();
+
+  if (!patientId) { alert('المريض غير محدد'); return; }
+  if (amount <= 0) { alert('أدخل مبلغاً صحيحاً'); return; }
+  if (!description) { alert('أدخل وصف الدفعة'); return; }
+
+  // Prepare image first (if any) - this is the slow part
+  let invoiceUrl = '';
+  const hasImage = !!pendingExpenseImage;
+
+  if (hasImage) {
+    const btn = document.getElementById('saveExpenseBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ جاري رفع الصورة...';
+    try {
+      // Try Cloudinary first if configured
+      if (CLOUDINARY_CONFIG.cloudName && CLOUDINARY_CONFIG.uploadPreset) {
+        try {
+          invoiceUrl = await uploadToCloudinary(pendingExpenseImage.dataUrl);
+        } catch (e) { console.warn('Cloudinary failed:', e); }
+      }
+      // Fallback to base64 if small enough
+      if (!invoiceUrl && pendingExpenseImage.dataUrl.length < 600000) {
+        invoiceUrl = pendingExpenseImage.dataUrl;
+      }
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = 'حفظ';
+      alert('فشل معالجة الصورة');
+      return;
+    }
+  }
+
+  // Close modal and save
+  closeExpense();
+  toast('⏳ جاري الحفظ...');
+
+  let done = false;
+  db.collection(EXPENSES_COLLECTION).add({
+    patientId,
+    amount,
+    description,
+    notes,
+    invoiceUrl: invoiceUrl || '',
+    paidBy: currentUser.username,
+    paidByName: currentUser.name,
+    paidAt: firebase.firestore.FieldValue.serverTimestamp(),
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(() => {
+    if (done) return;
+    done = true;
+    toast('✓ تم حفظ الدفعة');
+  }).catch((e) => {
+    if (done) return;
+    done = true;
+    handleDbError(e, 'فشل الحفظ');
+  });
+
+  setTimeout(() => {
+    if (done) return;
+    done = true;
+    toast('📥 حُفظ محلياً - سيُزامن عند عودة الاتصال');
+  }, 2500);
+}
+
+async function deleteExpense(id) {
+  if (!confirm('حذف هذه الدفعة؟')) return;
+  try {
+    await db.collection(EXPENSES_COLLECTION).doc(id).delete();
+    toast('🗑 تم الحذف');
+  } catch (e) { handleDbError(e, 'فشل الحذف'); }
+}
+
+function showImg(url) {
+  document.getElementById('imgPreviewImg').src = url;
+  document.getElementById('imgPreview').classList.remove('hidden');
+}
+
+function closeImgPreview() {
+  document.getElementById('imgPreview').classList.add('hidden');
+}
+
+/* ============================================================
+   إدارة الأعضاء (للمشرف فقط)
+   ============================================================ */
+function memberDonationStats(username) {
+  const items = donations.filter(d => d.addedBy === username);
+  const active = items.filter(d => d.status !== 'cancelled');
+  return {
+    items,
+    count: items.length,
+    total: active.reduce((s, d) => s + (d.amount || 0), 0),
+    patients: active.reduce((s, d) => s + (d.patients || 1), 0),
+    confirmed: items.filter(d => d.status === 'confirmed').length,
+    confirmedAmt: items.filter(d => d.status === 'confirmed').reduce((s, d) => s + (d.amount || 0), 0),
+    pending: items.filter(d => d.status === 'pending').length,
+    pendingAmt: items.filter(d => d.status === 'pending').reduce((s, d) => s + (d.amount || 0), 0),
+    cancelled: items.filter(d => d.status === 'cancelled').length,
+    adminConfirmed: items.filter(d => d.adminConfirmed).length,
+    adminConfirmedAmt: items.filter(d => d.adminConfirmed && d.status !== 'cancelled').reduce((s, d) => s + (d.amount || 0), 0)
+  };
+}
+
+function renderMembers() {
+  const list = document.getElementById('membersList');
+  if (!list) return;
+  if (currentUser?.role !== 'admin') {
+    list.innerHTML = '<div class="empty">للمشرف فقط</div>';
+    return;
+  }
+  const search = (document.getElementById('srchMembers')?.value || '').trim().toLowerCase();
+
+  // Build combined list: default admin + members from Firestore
+  let entries = Object.values(allMembers);
+  // Add default admin if not already in members
+  if (!allMembers[DEFAULT_ADMIN.username]) {
+    entries.unshift({ ...DEFAULT_ADMIN, _isDefault: true, active: true });
+  }
+
+  if (search) {
+    entries = entries.filter(m =>
+      (m.name || '').toLowerCase().includes(search) ||
+      (m.username || '').toLowerCase().includes(search)
+    );
+  }
+
+  // Sort: admins first, then by name
+  entries.sort((a, b) => {
+    if (a.role === 'admin' && b.role !== 'admin') return -1;
+    if (a.role !== 'admin' && b.role === 'admin') return 1;
+    return (a.name || '').localeCompare(b.name || '', 'ar');
+  });
+
+  if (!entries.length) {
+    list.innerHTML = '<div class="empty">لا يوجد أعضاء</div>';
+    return;
+  }
+
+  list.innerHTML = entries.map(m => {
+    const stats = memberDonationStats(m.username);
+    const isActive = m.active !== false;
+    const isDefault = m._isDefault;
+    return `
+      <div class="member-card ${m.role === 'admin' ? 'admin-role' : ''} ${!isActive ? 'inactive' : ''}">
+        <div class="member-top">
+          <div class="member-info">
+            <div class="member-name">${escapeHtml(m.name || m.username)}</div>
+            <div class="member-username">
+              ${m.role === 'admin' ? '<span class="member-role-tag role-admin">👑 مشرف</span>' : '<span class="member-role-tag role-member">عضو</span>'}
+              ${!isActive ? '<span class="member-role-tag role-inactive">معطّل</span>' : ''}
+              ${escapeHtml(m.username)} ${m.phone ? '• 📞 ' + escapeHtml(m.phone) : ''}
+            </div>
+          </div>
+        </div>
+        <div class="member-stats">
+          <div class="member-stat"><div class="v">${stats.count}</div><div class="l">تبرعات</div></div>
+          <div class="member-stat"><div class="v">${fmt(stats.total)}</div><div class="l">إجمالي $</div></div>
+          <div class="member-stat"><div class="v">${stats.patients}</div><div class="l">مرضى</div></div>
+          <div class="member-stat"><div class="v" style="color:#d97706">${stats.adminConfirmed}</div><div class="l">⭐ مؤكد</div></div>
+        </div>
+        <div class="member-actions">
+          <button class="stats" onclick="openMemberStats('${escapeJs(m.username)}')">📊 تفاصيل</button>
+          <button class="pdf" onclick="generateUserReport('${escapeJs(m.username)}')">📄 PDF</button>
+          ${!isDefault ? `<button class="edit" onclick="openEditMember('${escapeJs(m.username)}')">✎ تعديل</button>` : ''}
+          ${!isDefault ? `<button class="pwd" onclick="openPwd('${escapeJs(m.username)}')">🔑 كلمة المرور</button>` : ''}
+          ${!isDefault ? `<button class="toggle" onclick="toggleMemberActive('${escapeJs(m.username)}')">${isActive ? '⛔ تعطيل' : '✓ تفعيل'}</button>` : ''}
+          ${!isDefault && m.username !== currentUser.username ? `<button class="del" onclick="deleteMember('${escapeJs(m.username)}')">🗑 حذف</button>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function escapeJs(s) { return String(s).replace(/'/g, "\\'"); }
+
+function openAddMember() {
+  editingMemberId = null;
+  document.getElementById('memberModalTitle').textContent = '➕ إضافة عضو جديد';
+  document.getElementById('mmUsername').value = '';
+  document.getElementById('mmUsername').disabled = false;
+  document.getElementById('mmName').value = '';
+  document.getElementById('mmPwd').value = '';
+  document.getElementById('mmPhone').value = '';
+  document.getElementById('mmPwdRow').style.display = 'block';
+  setMemberRole('member');
+  setMemberActive(true);
+  document.getElementById('memberModal').classList.remove('hidden');
+}
+
+function openEditMember(username) {
+  const m = allMembers[username];
+  if (!m) return;
+  editingMemberId = username;
+  document.getElementById('memberModalTitle').textContent = '✎ تعديل العضو';
+  document.getElementById('mmUsername').value = username;
+  document.getElementById('mmUsername').disabled = true;
+  document.getElementById('mmName').value = m.name || '';
+  document.getElementById('mmPhone').value = m.phone || '';
+  document.getElementById('mmPwdRow').style.display = 'none'; // password via separate modal
+  setMemberRole(m.role || 'member');
+  setMemberActive(m.active !== false);
+  document.getElementById('memberModal').classList.remove('hidden');
+}
+
+function closeMember() {
+  editingMemberId = null;
+  document.getElementById('memberModal').classList.add('hidden');
+}
+
+function setMemberRole(r) {
+  memberRoleChoice = r;
+  document.getElementById('mmRoleMember').classList.toggle('active', r === 'member');
+  document.getElementById('mmRoleAdmin').classList.toggle('active', r === 'admin');
+}
+
+function setMemberActive(a) {
+  memberActiveChoice = a;
+  document.getElementById('mmActive').classList.toggle('active', a);
+  document.getElementById('mmInactive').classList.toggle('active', !a);
+}
+
+async function saveMember() {
+  const username = document.getElementById('mmUsername').value.trim().toLowerCase();
+  const name = document.getElementById('mmName').value.trim();
+  const pwd = document.getElementById('mmPwd').value;
+  const phone = document.getElementById('mmPhone').value.trim();
+
+  if (!username) { alert('أدخل اسم المستخدم'); return; }
+  if (!/^[a-z0-9_]+$/.test(username)) { alert('اسم المستخدم يقبل: أحرف إنجليزية صغيرة وأرقام و _ فقط'); return; }
+  if (!name) { alert('أدخل الاسم الكامل'); return; }
+
+  const isNew = !editingMemberId;
+  const targetId = editingMemberId || username;
+
+  if (isNew) {
+    if (!pwd || pwd.length < 6) { alert('كلمة المرور: 6 أحرف على الأقل'); return; }
+    if (allMembers[username]) { alert('اسم المستخدم موجود مسبقاً'); return; }
+  }
+
+  const saveBtn = document.querySelector('#memberModal button[onclick="saveMember()"]');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ جاري الحفظ...'; }
+  const restore = () => { if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'حفظ'; } };
+
+  try {
+    if (isNew) {
+      // إنشاء حساب المصادقة عبر التطبيق الثانوي (كي لا يُخرج المشرف)
+      const secAuth = getSecondaryAuth();
+      const cred = await secAuth.createUserWithEmailAndPassword(toEmail(username), pwd);
+      // كتابة الملف الشخصي - بدون أي كلمة مرور
+      await db.collection(USERS_COLLECTION).doc(username).set({
+        name, phone,
+        role: memberRoleChoice,
+        active: memberActiveChoice,
+        authUid: cred.user.uid,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        createdBy: currentUser.username
+      });
+      await secAuth.signOut(); // تنظيف جلسة التطبيق الثانوي
+      restore();
+      closeMember();
+      toast('✓ تمت إضافة العضو');
+    } else {
+      // تعديل: تحديث الملف فقط (لا تغيير لكلمة المرور هنا)
+      await db.collection(USERS_COLLECTION).doc(targetId).update({
+        name, phone,
+        role: memberRoleChoice,
+        active: memberActiveChoice,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedBy: currentUser.username
+      });
+      restore();
+      closeMember();
+      toast('✓ تم تحديث العضو');
+    }
+  } catch (e) {
+    restore();
+    console.error('Save member error:', e);
+    if ((e.code || '') === 'auth/email-already-in-use') {
+      alert('اسم المستخدم محجوز في نظام الدخول مسبقاً');
+    } else if ((e.code || '') === 'auth/weak-password') {
+      alert('كلمة المرور ضعيفة - استعمل 6 أحرف على الأقل');
+    } else {
+      handleDbError(e, 'فشل الحفظ');
+    }
+  }
+}
+
+function openMyPwd() {
+  openPwd(currentUser.username);
+}
+
+function openPwd(username) {
+  pwdTargetUser = username;
+  const m = allMembers[username] || {};
+  const isSelf = username === currentUser.username;
+  document.getElementById('pwdMember').value = (m.name || username) + ' (' + username + ')';
+  document.getElementById('pwdNew').value = '';
+  // ملاحظة توضيحية حسب الحالة
+  const note = document.getElementById('pwdNote');
+  if (note) {
+    if (isSelf) {
+      note.textContent = 'ستغيّر كلمة مرورك أنت. قد يُطلب منك تسجيل الدخول من جديد لأسباب أمنية.';
+      note.style.color = '#6b7280';
+    } else {
+      note.textContent = '⚠️ لأسباب أمنية لا يمكن للمشرف تغيير كلمة مرور عضو آخر مباشرة. اطلب من العضو الدخول بحسابه وتغيير كلمته بنفسه من هنا.';
+      note.style.color = '#b45309';
+    }
+  }
+  document.getElementById('pwdModal').classList.remove('hidden');
+}
+
+function closePwd() {
+  pwdTargetUser = null;
+  document.getElementById('pwdModal').classList.add('hidden');
+}
+
+async function savePwd() {
+  if (!pwdTargetUser) return;
+  const newPwd = document.getElementById('pwdNew').value;
+  const isSelf = pwdTargetUser === currentUser.username;
+
+  if (!isSelf) {
+    alert('لا يمكن تغيير كلمة مرور عضو آخر من المتصفح.\n\nالحل: يسجّل العضو الدخول بحسابه ثم يغيّر كلمته بنفسه.');
+    return;
+  }
+  if (!newPwd || newPwd.length < 6) { alert('كلمة المرور: 6 أحرف على الأقل'); return; }
+
+  const target = pwdTargetUser;
+  closePwd();
+  toast('⏳ جاري الحفظ...');
+
+  try {
+    await auth.currentUser.updatePassword(newPwd);
+    toast('🔑 تم تحديث كلمة المرور');
+  } catch (e) {
+    console.error('Password update error:', e);
+    if ((e.code || '') === 'auth/requires-recent-login') {
+      alert('لأسباب أمنية، سجّل الخروج ثم الدخول من جديد، وبعدها غيّر كلمة المرور مباشرة.');
+    } else if ((e.code || '') === 'auth/weak-password') {
+      alert('كلمة المرور ضعيفة - استعمل 6 أحرف على الأقل');
+    } else {
+      alert('فشل التحديث: ' + (e.message || 'خطأ غير معروف'));
+    }
+  }
+}
+
+async function toggleMemberActive(username) {
+  const m = allMembers[username];
+  if (!m) return;
+  const newActive = m.active === false;
+  if (!confirm(newActive ? 'تفعيل هذا العضو؟' : 'تعطيل هذا العضو؟ لن يستطيع الدخول')) return;
+  try {
+    await db.collection(USERS_COLLECTION).doc(username).update({
+      active: newActive,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedBy: currentUser.username
+    });
+    toast(newActive ? '✓ تم التفعيل' : '⛔ تم التعطيل');
+  } catch (e) { handleDbError(e, 'فشل التحديث'); }
+}
+
+async function deleteMember(username) {
+  if (username === currentUser.username) { alert('لا يمكنك حذف نفسك'); return; }
+  const stats = memberDonationStats(username);
+  let msg = `حذف العضو "${(allMembers[username] || {}).name || username}" نهائياً؟`;
+  if (stats.count > 0) msg += `\n⚠️ هذا العضو له ${stats.count} تبرع (لن تُحذف التبرعات)`;
+  msg += `\n\nملاحظة: سيُمنع العضو من الدخول فوراً. (حساب الدخول يبقى محجوزاً تقنياً ولا يمكن إعادة استخدام نفس الاسم لعضو جديد إلا بعد حذفه من لوحة Firebase).`;
+  if (!confirm(msg)) return;
+  try {
+    await db.collection(USERS_COLLECTION).doc(username).delete();
+    toast('🗑 تم الحذف');
+  } catch (e) { handleDbError(e, 'فشل الحذف'); }
+}
+
+function openMemberStats(username) {
+  const m = username === DEFAULT_ADMIN.username ? DEFAULT_ADMIN : (allMembers[username] || { username, name: username });
+  const stats = memberDonationStats(username);
+  document.getElementById('memberStatsTitle').textContent = '📊 ' + (m.name || username);
+
+  const items = [...stats.items].sort((a, b) => {
+    const ta = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
+    const tb = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
+    return tb - ta;
+  });
+
+  document.getElementById('memberStatsContent').innerHTML = `
+    <div style="background:#eef4f7;padding:12px;border-radius:8px;margin-bottom:12px;font-size:13px;line-height:1.8">
+      <div><b>اسم المستخدم:</b> ${escapeHtml(username)}</div>
+      <div><b>الصلاحية:</b> ${m.role === 'admin' ? '👑 مشرف' : 'عضو لجنة'}</div>
+      ${m.phone ? `<div><b>الهاتف:</b> ${escapeHtml(m.phone)}</div>` : ''}
+    </div>
+    <div class="admin-grid">
+      <div class="admin-card"><div class="num">${stats.count}</div><div class="lbl">إجمالي التبرعات</div></div>
+      <div class="admin-card"><div class="num">${fmt(stats.total)}</div><div class="lbl">المبلغ الإجمالي $</div></div>
+      <div class="admin-card"><div class="num">${stats.patients}</div><div class="lbl">إجمالي المرضى</div></div>
+      <div class="admin-card" style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid #f59e0b"><div class="num" style="color:#d97706">${stats.adminConfirmed}</div><div class="lbl">⭐ مؤكد المشرف</div></div>
+      <div class="admin-card"><div class="num" style="color:#16a34a">${stats.confirmed}</div><div class="lbl">مؤكد</div></div>
+      <div class="admin-card"><div class="num" style="color:#eab308">${stats.pending}</div><div class="lbl">قيد المتابعة</div></div>
+    </div>
+    <h3 style="margin:14px 0 8px;font-size:14px;color:#2c5364">آخر التبرعات (${Math.min(items.length, 20)})</h3>
+    ${items.slice(0, 20).map(d => `
+      <div class="donation-card ${d.status} ${d.adminConfirmed ? 'admin-confirmed' : ''}" style="margin-bottom:6px">
+        ${d.adminConfirmed ? '<div class="admin-badge">⭐ مؤكد المشرف</div>' : ''}
+        <div class="donation-head">
+          <div class="donation-name">${escapeHtml(d.name || 'فاعل خير')}</div>
+          <div class="donation-amount">${fmt(d.amount)} $</div>
+        </div>
+        <div class="donation-meta">
+          ${d.phone ? `<span>📞 ${escapeHtml(d.phone)}</span>` : ''}
+          <span>👥 ${d.patients || 1}</span>
+          <span>${statusLabel(d.status)}</span>
+          <span>🕐 ${fmtTime(d.createdAt)}</span>
+        </div>
+      </div>
+    `).join('')}
+    ${items.length === 0 ? '<div class="empty">لا توجد تبرعات</div>' : ''}
+  `;
+
+  document.getElementById('memberPdfBtn').onclick = () => generateUserReport(username);
+  document.getElementById('memberStatsModal').classList.remove('hidden');
+}
+
+function closeMemberStats() {
+  document.getElementById('memberStatsModal').classList.add('hidden');
+}
+
+/* ============================================================
+   تقارير PDF
+   ============================================================ */
+function getPatientName(id) {
+  if (!id) return '';
+  const p = patients.find(x => x.id === id);
+  return p ? p.name : '(محذوف)';
+}
+
+function generatePatientReport(patientId) {
+  const p = patients.find(x => x.id === patientId);
+  if (!p) return;
+  const stats = patientStats(patientId);
+  const status = p.status || 'active';
+  const target = p.targetAmount || 0;
+  const now = new Date().toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' });
+
+  // Sort donations and expenses
+  const inItems = [...stats.inDonations].sort((a, b) => {
+    const ta = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
+    const tb = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
+    return tb - ta;
+  });
+  const outItems = [...stats.expenses].sort((a, b) => {
+    const ta = (a.paidAt || a.createdAt) && (a.paidAt || a.createdAt).toMillis ? (a.paidAt || a.createdAt).toMillis() : 0;
+    const tb = (b.paidAt || b.createdAt) && (b.paidAt || b.createdAt).toMillis ? (b.paidAt || b.createdAt).toMillis() : 0;
+    return tb - ta;
+  });
+
+  const html = `
+    <div class="pdf-report">
+      <h1>🏥 تقرير حالة المريض</h1>
+      <div class="subtitle">${escapeHtml(p.name)} • ${status === 'active' ? 'نشط' : status === 'completed' ? 'مكتمل' : 'مغلق'}</div>
+      <div class="subtitle">تاريخ التقرير: ${escapeHtml(now)}</div>
+
+      <div class="summary-box">
+        ${p.condition ? `<div><b>التفاصيل:</b> ${escapeHtml(p.condition)}</div>` : ''}
+        ${target > 0 ? `<div><b>المبلغ المطلوب:</b> ${fmt(target)} $</div>` : ''}
+        <div class="summary-grid" style="margin-top:8px">
+          <div>⬆️ إجمالي الدخل: <b style="color:#16a34a">${fmt(stats.totalIn)} $</b></div>
+          <div>⬇️ إجمالي الصرف: <b style="color:#dc2626">${fmt(stats.totalOut)} $</b></div>
+          <div>💰 الرصيد: <b style="color:${stats.balance < 0 ? '#dc2626' : '#2c5364'}">${fmt(stats.balance)} $</b></div>
+          ${target > 0 ? `<div>📊 التقدّم: <b>${Math.min(100, (stats.totalIn / target * 100)).toFixed(0)}%</b></div>` : ''}
+        </div>
+        ${p.notes ? `<div style="margin-top:6px"><b>ملاحظات:</b> ${escapeHtml(p.notes)}</div>` : ''}
+      </div>
+
+      <h2 style="font-size:14px;color:#16a34a;margin:14px 0 6px">⬆️ التبرعات الواردة (${inItems.length})</h2>
+      ${inItems.length === 0 ? '<p style="color:#999">لا توجد تبرعات</p>' : `
+      <table>
+        <thead>
+          <tr><th>#</th><th>المتبرع</th><th>الهاتف</th><th>الحصة $</th><th>أصل التبرع</th><th>المسؤول</th><th>التاريخ</th></tr>
+        </thead>
+        <tbody>
+          ${inItems.map((d, i) => `
+            <tr>
+              <td>${i + 1}</td>
+              <td>${escapeHtml(d.name || 'فاعل خير')}</td>
+              <td>${escapeHtml(d.phone || '-')}</td>
+              <td><b>${fmt(d.share)}</b></td>
+              <td>${fmt(d.amount)} ${d.patientIds && d.patientIds.length > 1 ? `(÷${d.patientIds.length})` : ''}</td>
+              <td>${escapeHtml(d.addedByName || '')}</td>
+              <td>${fmtTime(d.createdAt)}</td>
+            </tr>
+          `).join('')}
+          <tr class="totals">
+            <td colspan="3">إجمالي الدخل</td>
+            <td colspan="4">${fmt(stats.totalIn)} $</td>
+          </tr>
+        </tbody>
+      </table>`}
+
+      <h2 style="font-size:14px;color:#dc2626;margin:14px 0 6px">⬇️ المصاريف / الفواتير (${outItems.length})</h2>
+      ${outItems.length === 0 ? '<p style="color:#999">لا توجد مصاريف</p>' : `
+      <table>
+        <thead>
+          <tr><th>#</th><th>الوصف</th><th>المبلغ $</th><th>الدافع</th><th>التاريخ</th><th>ملاحظات</th></tr>
+        </thead>
+        <tbody>
+          ${outItems.map((e, i) => `
+            <tr>
+              <td>${i + 1}</td>
+              <td>${escapeHtml(e.description || '')}</td>
+              <td><b>${fmt(e.amount)}</b></td>
+              <td>${escapeHtml(e.paidByName || '')}</td>
+              <td>${fmtTime(e.paidAt || e.createdAt)}</td>
+              <td>${escapeHtml(e.notes || '')}</td>
+            </tr>
+          `).join('')}
+          <tr class="totals">
+            <td colspan="2">إجمالي المصاريف</td>
+            <td colspan="4">${fmt(stats.totalOut)} $</td>
+          </tr>
+        </tbody>
+      </table>`}
+
+      <div style="margin-top:14px;padding:12px;background:${stats.balance < 0 ? '#fef2f2' : '#f0fdf4'};border-radius:8px;text-align:center">
+        <div style="font-size:13px;color:#555">الرصيد المتبقي للمريض</div>
+        <div style="font-size:22px;font-weight:bold;color:${stats.balance < 0 ? '#dc2626' : '#16a34a'};margin-top:4px">${fmt(stats.balance)} $</div>
+      </div>
+
+      <div class="footer">سجل تبرعات اللجنة • ${escapeHtml(now)}</div>
+    </div>
+  `;
+
+  renderPdf(html, `مريض_${p.name}_${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
+function generateUserReport(username) {
+  const m = username === DEFAULT_ADMIN.username ? DEFAULT_ADMIN : (allMembers[username] || { username, name: username });
+  const stats = memberDonationStats(username);
+  const items = [...stats.items].sort((a, b) => {
+    const ta = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
+    const tb = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
+    return tb - ta;
+  });
+
+  const now = new Date().toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' });
+
+  const html = `
+    <div class="pdf-report">
+      <h1>📞 تقرير عضو اللجنة</h1>
+      <div class="subtitle">${escapeHtml(m.name || username)} • ${escapeHtml(username)} • ${m.role === 'admin' ? '👑 مشرف' : 'عضو لجنة'}</div>
+      <div class="subtitle">تاريخ التقرير: ${escapeHtml(now)}</div>
+
+      <div class="summary-box">
+        <div class="summary-grid">
+          <div>📊 إجمالي التبرعات: <b>${stats.count}</b></div>
+          <div>💰 المبلغ الإجمالي: <b>${fmt(stats.total)} $</b></div>
+          <div>👥 إجمالي المرضى: <b>${stats.patients}</b></div>
+          <div>⭐ مؤكد المشرف: <b>${stats.adminConfirmed} (${fmt(stats.adminConfirmedAmt)} $)</b></div>
+          <div>✓ مؤكد: <b>${stats.confirmed} (${fmt(stats.confirmedAmt)} $)</b></div>
+          <div>⏳ قيد المتابعة: <b>${stats.pending} (${fmt(stats.pendingAmt)} $)</b></div>
+          <div>✕ ملغى: <b>${stats.cancelled}</b></div>
+        </div>
+      </div>
+
+      <h2 style="font-size:15px;color:#2c5364;margin:14px 0 6px">تفاصيل التبرعات</h2>
+      ${items.length === 0 ? '<p style="text-align:center;color:#999">لا توجد تبرعات</p>' : `
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>الاسم</th>
+            <th>الهاتف</th>
+            <th>عبر من</th>
+            <th>المبلغ $</th>
+            <th>مرضى</th>
+            <th>الحالة</th>
+            <th>التاريخ</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map((d, i) => `
+            <tr>
+              <td>${i + 1}</td>
+              <td>${escapeHtml(d.name || 'فاعل خير')} ${d.adminConfirmed ? '<span class="badge-admin">⭐</span>' : ''}</td>
+              <td>${escapeHtml(d.phone || '-')}</td>
+              <td>${escapeHtml(d.via || '-')}</td>
+              <td><b>${fmt(d.amount)}</b></td>
+              <td>${d.patients || 1}</td>
+              <td>${statusLabel(d.status).replace(/[✓⏳✕]\s*/g, '')}</td>
+              <td>${fmtTime(d.createdAt)}</td>
+            </tr>
+          `).join('')}
+          <tr class="totals">
+            <td colspan="4">الإجمالي</td>
+            <td>${fmt(stats.total)}</td>
+            <td>${stats.patients}</td>
+            <td colspan="2"></td>
+          </tr>
+        </tbody>
+      </table>
+      `}
+
+      <div class="footer">
+        تم إنشاء التقرير بواسطة سجل تبرعات اللجنة • ${escapeHtml(now)}
+      </div>
+    </div>
+  `;
+
+  renderPdf(html, `تقرير_${m.name || username}_${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
+function generateFullReport() {
+  const totalAmt = donations.filter(d => d.status !== 'cancelled').reduce((s, d) => s + (d.amount || 0), 0);
+  const confirmedAmt = donations.filter(d => d.status === 'confirmed').reduce((s, d) => s + (d.amount || 0), 0);
+  const pendingAmt = donations.filter(d => d.status === 'pending').reduce((s, d) => s + (d.amount || 0), 0);
+  const adminConfirmedAmt = donations.filter(d => d.adminConfirmed && d.status !== 'cancelled').reduce((s, d) => s + (d.amount || 0), 0);
+  const totalPatients = donations.filter(d => d.status !== 'cancelled').reduce((s, d) => s + (d.patients || 1), 0);
+
+  const members = [...new Set(donations.map(d => d.addedBy).filter(Boolean))];
+  const now = new Date().toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' });
+
+  const html = `
+    <div class="pdf-report">
+      <h1>📞 التقرير الشامل لتبرعات اللجنة</h1>
+      <div class="subtitle">تاريخ التقرير: ${escapeHtml(now)}</div>
+
+      <div class="summary-box">
+        <div class="summary-grid">
+          <div>📊 إجمالي التبرعات: <b>${donations.length}</b></div>
+          <div>💰 الإجمالي: <b>${fmt(totalAmt)} $</b></div>
+          <div>✓ مؤكد: <b>${fmt(confirmedAmt)} $</b></div>
+          <div>⭐ مؤكد المشرف: <b>${fmt(adminConfirmedAmt)} $</b></div>
+          <div>⏳ قيد المتابعة: <b>${fmt(pendingAmt)} $</b></div>
+          <div>👥 إجمالي المرضى: <b>${totalPatients}</b></div>
+        </div>
+      </div>
+
+      <h2 style="font-size:15px;color:#2c5364;margin:14px 0 6px">ملخص حسب الأعضاء</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>العضو</th>
+            <th>تبرعات</th>
+            <th>الإجمالي $</th>
+            <th>مرضى</th>
+            <th>⭐ مؤكد المشرف</th>
+            <th>قيد المتابعة</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${members.map(m => {
+            const s = memberDonationStats(m);
+            return `
+              <tr>
+                <td><b>${escapeHtml(getMemberName(m))}</b></td>
+                <td>${s.count}</td>
+                <td><b>${fmt(s.total)}</b></td>
+                <td>${s.patients}</td>
+                <td>${s.adminConfirmed} (${fmt(s.adminConfirmedAmt)})</td>
+                <td>${s.pending} (${fmt(s.pendingAmt)})</td>
+              </tr>
+            `;
+          }).join('')}
+          <tr class="totals">
+            <td>الإجمالي العام</td>
+            <td>${donations.length}</td>
+            <td>${fmt(totalAmt)}</td>
+            <td>${totalPatients}</td>
+            <td colspan="2"></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2 style="font-size:15px;color:#2c5364;margin:14px 0 6px">جميع التبرعات</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>المتبرع</th>
+            <th>الهاتف</th>
+            <th>المبلغ</th>
+            <th>مرضى</th>
+            <th>الحالة</th>
+            <th>المسؤول</th>
+            <th>التاريخ</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${donations.map((d, i) => `
+            <tr>
+              <td>${i + 1}</td>
+              <td>${escapeHtml(d.name || 'فاعل خير')} ${d.adminConfirmed ? '<span class="badge-admin">⭐</span>' : ''}</td>
+              <td>${escapeHtml(d.phone || '-')}</td>
+              <td><b>${fmt(d.amount)}</b></td>
+              <td>${d.patients || 1}</td>
+              <td>${statusLabel(d.status).replace(/[✓⏳✕]\s*/g, '')}</td>
+              <td>${escapeHtml(getMemberName(d.addedBy))}</td>
+              <td>${fmtTime(d.createdAt)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+
+      <div class="footer">سجل تبرعات اللجنة • ${escapeHtml(now)}</div>
+    </div>
+  `;
+
+  renderPdf(html, `تقرير_شامل_${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
+function renderPdf(html, filename) {
+  const container = document.getElementById('pdfContainer');
+  container.innerHTML = html;
+  toast('⏳ جاري إنشاء PDF...');
+  setTimeout(() => {
+    html2pdf().from(container.firstElementChild).set({
+      margin: [10, 8, 12, 8],
+      filename: filename,
+      image: { type: 'jpeg', quality: 0.95 },
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    }).save().then(() => {
+      container.innerHTML = '';
+      toast('✓ تم تحميل التقرير');
+    }).catch(e => {
+      console.error(e);
+      alert('فشل إنشاء PDF: ' + e.message);
+      container.innerHTML = '';
+    });
+  }, 100);
+}
+
+/* ============================================================
+   التبويبات
+   ============================================================ */
+function switchTab(tab) {
+  document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
+  document.getElementById('sec-' + tab).classList.add('active');
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  // Hide FAB on the "new donation" tab itself, show elsewhere
+  const fab = document.getElementById('fab');
+  if (fab) fab.classList.toggle('hidden', tab === 'new');
+  window.scrollTo(0, 0);
+}
+
+/* ============================================================
+   التصدير
+   ============================================================ */
+function exportCSV() {
+  const headers = ['الاسم', 'الهاتف', 'عبر من', 'المبلغ', 'عدد المرضى', 'الحالة', 'المسؤول', 'الوقت', 'ملاحظات'];
+  const rows = donations.map(d => [
+    d.name || 'فاعل خير',
+    d.phone || '',
+    d.via || '',
+    d.amount || 0,
+    d.patients || 1,
+    statusLabel(d.status).replace(/[✓⏳✕]\s*/g, ''),
+    getMemberName(d.addedBy),
+    fmtTime(d.createdAt),
+    (d.notes || '').replace(/\n/g, ' ')
+  ]);
+  const csv = '\uFEFF' + [headers, ...rows].map(r =>
+    r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')
+  ).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  downloadBlob(blob, `donations_${new Date().toISOString().slice(0, 10)}.csv`);
+}
+
+function exportBackup() {
+  const data = JSON.stringify(donations.map(d => ({
+    ...d,
+    createdAt: d.createdAt && d.createdAt.toDate ? d.createdAt.toDate().toISOString() : null,
+    updatedAt: d.updatedAt && d.updatedAt.toDate ? d.updatedAt.toDate().toISOString() : null
+  })), null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  downloadBlob(blob, `donations_backup_${new Date().toISOString().slice(0, 10)}.json`);
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* ============================================================
+   توست
+   ============================================================ */
+let toastTimer = null;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+/* ============================================================
+   ربط الأحداث
+   ============================================================ */
+document.getElementById('srchFeed').addEventListener('input', renderFeed);
+document.getElementById('filterFeed').addEventListener('change', renderFeed);
+document.getElementById('srchFiles').addEventListener('input', renderFiles);
+document.getElementById('srchAdmin').addEventListener('input', renderAdmin);
+document.getElementById('filterAdmin').addEventListener('change', renderAdmin);
+document.getElementById('srchMembers').addEventListener('input', renderMembers);
+document.getElementById('srchPatients').addEventListener('input', renderPatients);
+document.getElementById('filterPatients').addEventListener('change', renderPatients);
+document.getElementById('inpAmount').addEventListener('input', updateSplitPreview);
+document.getElementById('loginPass').addEventListener('keypress', e => { if (e.key === 'Enter') doLogin(); });
+
+setupExpenseImageListener();
+
+/* ============================================================
+   استرجاع جلسة سابقة (عبر Firebase Authentication الآمن)
+   ============================================================ */
+initFirebase();
+if (auth) {
+  auth.onAuthStateChanged(async (user) => {
+    if (!user) return; // لا جلسة - تبقى شاشة الدخول
+    // استخرج اسم المستخدم من البريد الوهمي
+    const username = (user.email || '').replace(USERNAME_DOMAIN, '').toLowerCase();
+    if (!username) return;
+    try {
+      const doc = await db.collection(USERS_COLLECTION).doc(username).get();
+      const profile = doc.exists ? doc.data() : {};
+      if (profile.active === false) { await auth.signOut(); return; }
+      currentUser = {
+        uid: user.uid,
+        username,
+        name: profile.name || username,
+        role: profile.role || 'member',
+        phone: profile.phone || ''
+      };
+      enterApp();
+    } catch (e) {
+      console.warn('Session restore failed:', e);
+    }
+  });
+}
+</script>
+</body>
+</html>
