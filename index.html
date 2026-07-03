@@ -2428,15 +2428,6 @@ function renderFeed() {
   if (!filtered.length) {
     html += '<div class="empty"><div class="empty-icon">📋</div>لا توجد تبرعات بعد<br><small>ستظهر هنا فور إدخالها</small></div>';
   } else {
-    if (adminConfirmedList.length) {
-      const adminTotal = adminConfirmedList.filter(d => d.status !== 'cancelled').reduce((s, d) => s + (d.amount || 0), 0);
-      html += `
-        <div class="feed-section-head admin-section">
-          <span>⭐ مؤكد من المشرف</span>
-          <span class="count">${adminConfirmedList.length} • ${fmt(adminTotal)} $</span>
-        </div>
-        <div class="donations-grid">${adminConfirmedList.map(d => buildDonationCard(d, newIds.has(d.id))).join('')}</div>`;
-    }
     if (notConfirmedList.length) {
       const notTotal = notConfirmedList.filter(d => d.status !== 'cancelled').reduce((s, d) => s + (d.amount || 0), 0);
       html += `
@@ -2445,6 +2436,15 @@ function renderFeed() {
           <span class="count">${notConfirmedList.length} • ${fmt(notTotal)} $</span>
         </div>
         <div class="donations-grid">${notConfirmedList.map(d => buildDonationCard(d, newIds.has(d.id))).join('')}</div>`;
+    }
+    if (adminConfirmedList.length) {
+      const adminTotal = adminConfirmedList.filter(d => d.status !== 'cancelled').reduce((s, d) => s + (d.amount || 0), 0);
+      html += `
+        <div class="feed-section-head admin-section">
+          <span>⭐ مؤكد من المشرف</span>
+          <span class="count">${adminConfirmedList.length} • ${fmt(adminTotal)} $</span>
+        </div>
+        <div class="donations-grid">${adminConfirmedList.map(d => buildDonationCard(d, newIds.has(d.id))).join('')}</div>`;
     }
   }
 
