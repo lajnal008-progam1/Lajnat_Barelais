@@ -2292,7 +2292,7 @@ function buildDonationCard(d, isNew) {
     <div class="dg-card ${d.status} ${d.adminConfirmed ? 'admin-confirmed' : ''} ${isNew ? 'is-new' : ''}">
       ${d.adminConfirmed ? `<div class="dg-admin-badge">⭐ مؤكد المشرف</div>` : ''}
       <div class="dg-amount">${fmt(d.amount)}<span class="dg-amount-currency"> $</span></div>
-      <div class="dg-name">${escapeHtml(d.name || 'فاعل خير')}</div>
+      <div class="dg-name">${escapeHtml(donorDisplay(d))}</div>
       ${patientsTag}
       <div class="dg-meta">
         ${d.phone ? `<div class="dg-meta-row">📞 ${escapeHtml(d.phone)}</div>` : ''}
@@ -2460,6 +2460,16 @@ function donorKey(d) {
   return 'n:' + (d.name || '').trim().toLowerCase();
 }
 
+/* عرض اسم المتبرع: إذا كان "فاعل خير" يُعرض معه اسم العضو الذي أدخل التبرع
+   مثال: فاعل خير عبر فاروق الميس */
+function donorDisplay(d) {
+  const n = (d.name || '').trim() || 'فاعل خير';
+  if ((d.anonymous || n === 'فاعل خير') && d.addedByName) {
+    return 'فاعل خير عبر ' + d.addedByName;
+  }
+  return n;
+}
+
 function renderFiles() {
   const list = document.getElementById('filesList');
   const search = document.getElementById('srchFiles').value.trim().toLowerCase();
@@ -2467,9 +2477,9 @@ function renderFiles() {
   const groups = {};
   donations.forEach(d => {
     const k = donorKey(d);
-    if (!groups[k]) groups[k] = { name: d.name || 'فاعل خير', phone: d.phone || '', items: [] };
+    if (!groups[k]) groups[k] = { name: donorDisplay(d), phone: d.phone || '', items: [] };
     groups[k].items.push(d);
-    if (!groups[k].name || groups[k].name === 'فاعل خير') groups[k].name = d.name || groups[k].name;
+    if (!groups[k].name || groups[k].name.startsWith('فاعل خير')) groups[k].name = d.name || groups[k].name;
     if (!groups[k].phone) groups[k].phone = d.phone || '';
   });
 
@@ -2622,7 +2632,7 @@ function renderAdmin() {
         <div class="donation-card ${d.status} ${d.adminConfirmed ? 'admin-confirmed' : ''}">
           ${d.adminConfirmed ? `<div class="admin-badge">⭐ مؤكد من المشرف</div>` : ''}
           <div class="donation-head">
-            <div class="donation-name">${escapeHtml(d.name || 'فاعل خير')}</div>
+            <div class="donation-name">${escapeHtml(donorDisplay(d))}</div>
             <div class="donation-amount">${fmt(d.amount)} $</div>
           </div>
           <div class="donation-meta">
@@ -3106,7 +3116,7 @@ function renderPatientDetail(id) {
         return `
           <div class="expense-card donation-in">
             <div class="expense-head">
-              <div class="expense-desc">⬆️ ${escapeHtml(m.name || 'فاعل خير')}</div>
+              <div class="expense-desc">⬆️ ${escapeHtml(donorDisplay(m))}</div>
               <div class="expense-amount" style="color:#16a34a">+${fmt(m.share)} $</div>
             </div>
             <div class="expense-meta">
@@ -3633,7 +3643,7 @@ function openMemberStats(username) {
       <div class="donation-card ${d.status} ${d.adminConfirmed ? 'admin-confirmed' : ''}" style="margin-bottom:6px">
         ${d.adminConfirmed ? '<div class="admin-badge">⭐ مؤكد المشرف</div>' : ''}
         <div class="donation-head">
-          <div class="donation-name">${escapeHtml(d.name || 'فاعل خير')}</div>
+          <div class="donation-name">${escapeHtml(donorDisplay(d))}</div>
           <div class="donation-amount">${fmt(d.amount)} $</div>
         </div>
         <div class="donation-meta">
@@ -3712,7 +3722,7 @@ function generatePatientReport(patientId) {
           ${inItems.map((d, i) => `
             <tr>
               <td>${i + 1}</td>
-              <td>${escapeHtml(d.name || 'فاعل خير')}</td>
+              <td>${escapeHtml(donorDisplay(d))}</td>
               <td>${escapeHtml(d.phone || '-')}</td>
               <td><b>${fmt(d.share)}</b></td>
               <td>${fmt(d.amount)} ${d.patientIds && d.patientIds.length > 1 ? `(÷${d.patientIds.length})` : ''}</td>
@@ -3811,7 +3821,7 @@ function generateUserReport(username) {
           ${items.map((d, i) => `
             <tr>
               <td>${i + 1}</td>
-              <td>${escapeHtml(d.name || 'فاعل خير')} ${d.adminConfirmed ? '<span class="badge-admin">⭐</span>' : ''}</td>
+              <td>${escapeHtml(donorDisplay(d))} ${d.adminConfirmed ? '<span class="badge-admin">⭐</span>' : ''}</td>
               <td>${escapeHtml(d.phone || '-')}</td>
               <td>${escapeHtml(d.via || '-')}</td>
               <td><b>${fmt(d.amount)}</b></td>
@@ -3919,7 +3929,7 @@ function generateFullReport() {
           ${donations.map((d, i) => `
             <tr>
               <td>${i + 1}</td>
-              <td>${escapeHtml(d.name || 'فاعل خير')} ${d.adminConfirmed ? '<span class="badge-admin">⭐</span>' : ''}</td>
+              <td>${escapeHtml(donorDisplay(d))} ${d.adminConfirmed ? '<span class="badge-admin">⭐</span>' : ''}</td>
               <td>${escapeHtml(d.phone || '-')}</td>
               <td><b>${fmt(d.amount)}</b></td>
               <td>${d.patients || 1}</td>
@@ -3980,7 +3990,7 @@ function switchTab(tab) {
 function exportCSV() {
   const headers = ['الاسم', 'الهاتف', 'عبر من', 'المبلغ', 'عدد المرضى', 'الحالة', 'المسؤول', 'الوقت', 'ملاحظات'];
   const rows = donations.map(d => [
-    d.name || 'فاعل خير',
+    donorDisplay(d),
     d.phone || '',
     d.via || '',
     d.amount || 0,
