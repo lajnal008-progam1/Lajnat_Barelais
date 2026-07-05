@@ -411,6 +411,150 @@ body {
 }
 .bc-exit:hover { opacity: 1; }
 
+/* ============================================================
+   BAR MODE - Lower-third ticker (1920 x ~120px for OBS overlay)
+   Access via #bar
+   ============================================================ */
+#barMode {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  font-family: 'Segoe UI', 'Tajawal', Tahoma, sans-serif;
+  direction: rtl;
+}
+.bar-container {
+  display: flex;
+  align-items: stretch;
+  height: 110px;
+  background: linear-gradient(90deg, rgba(10, 18, 35, 0.97) 0%, rgba(15, 30, 55, 0.95) 100%);
+  border-top: 3px solid #f59e0b;
+  box-shadow: 0 -8px 30px rgba(0,0,0,0.5);
+  overflow: hidden;
+}
+
+/* Brand block */
+.bar-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 26px;
+  background: linear-gradient(135deg, #dc2626, #991b1b);
+  min-width: 150px;
+  position: relative;
+}
+.bar-live-dot {
+  width: 12px;
+  height: 12px;
+  background: white;
+  border-radius: 50%;
+  animation: livePulse 1.5s ease-in-out infinite;
+}
+.bar-brand-text {
+  color: white;
+  font-weight: 800;
+  font-size: 17px;
+  white-space: nowrap;
+}
+
+/* Total block */
+.bar-total {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 34px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.1));
+  border-left: 1px solid rgba(255,255,255,0.1);
+  border-right: 1px solid rgba(255,255,255,0.1);
+  min-width: 280px;
+}
+.bar-total-label {
+  font-size: 14px;
+  color: #fbbf24;
+  font-weight: 600;
+  margin-bottom: 2px;
+  white-space: nowrap;
+}
+.bar-total-value {
+  font-size: 46px;
+  font-weight: 900;
+  line-height: 1;
+  background: linear-gradient(180deg, #fbbf24, #f59e0b);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -1px;
+  white-space: nowrap;
+  transition: transform 0.3s;
+}
+.bar-total-value.pulse {
+  animation: totalPulse 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Donors block */
+.bar-donors {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 28px;
+  border-right: 1px solid rgba(255,255,255,0.1);
+  min-width: 130px;
+}
+.bar-donors-num {
+  font-size: 38px;
+  font-weight: 900;
+  color: white;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  transition: transform 0.3s;
+}
+.bar-donors-num.pulse {
+  animation: totalPulse 0.6s ease-out;
+}
+.bar-donors-label {
+  font-size: 13px;
+  color: #94a3b8;
+  margin-top: 3px;
+  white-space: nowrap;
+}
+
+/* Ticker area (fills the rest) */
+.bar-ticker {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  direction: ltr;
+  padding: 0 10px;
+}
+.bar-ticker-content {
+  display: inline-block;
+  white-space: nowrap;
+  padding-left: 100%;
+  animation: tickerScroll 35s linear infinite;
+  font-size: 24px;
+  color: white;
+}
+.bar-ticker-item {
+  display: inline-block;
+  margin: 0 26px;
+  direction: rtl;
+}
+.bar-ticker-item .amt {
+  color: #fbbf24;
+  font-weight: 800;
+}
+.bar-ticker-item .dot {
+  color: #475569;
+  margin: 0 12px;
+}
+
 /* Responsive - keep readable on smaller screens */
 @media (max-width: 900px) {
   .bc-main { grid-template-columns: 1fr; }
@@ -1884,6 +2028,30 @@ body.is-admin .admin-only { display: flex; }
   <button class="bc-exit" onclick="exitBroadcast()" title="خروج">×</button>
 </div>
 
+<!-- ===== Bar Mode (lower-third ticker for OBS overlay) ===== -->
+<div id="barMode" class="hidden">
+  <div class="bar-container">
+    <div class="bar-brand">
+      <span class="bar-live-dot"></span>
+      <span class="bar-brand-text">لجنة التبرعات</span>
+    </div>
+
+    <div class="bar-total">
+      <span class="bar-total-label">⭐ الإجمالي المؤكد</span>
+      <span class="bar-total-value" id="barTotal">0 $</span>
+    </div>
+
+    <div class="bar-donors">
+      <span class="bar-donors-num" id="barDonors">0</span>
+      <span class="bar-donors-label">👥 متبرع</span>
+    </div>
+
+    <div class="bar-ticker">
+      <div class="bar-ticker-content" id="barTicker"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ===== Login Screen ===== -->
 <div id="login">
   <div class="login-box">
@@ -2410,11 +2578,28 @@ function isBroadcastMode() {
   return h.includes('board') || h.includes('live') || h.includes('broadcast');
 }
 
+function isBarMode() {
+  const h = (location.hash || '').toLowerCase();
+  return h.includes('bar') || h.includes('ticker') || h.includes('strip');
+}
+
 function enterBroadcast() {
+  const barOnly = isBarMode();
+
   document.getElementById('login').classList.add('hidden');
   document.getElementById('app') && document.getElementById('app').classList.add('hidden');
-  document.getElementById('broadcast').classList.remove('hidden');
-  document.title = '💝 لجنة التبرعات المباشرة';
+
+  if (barOnly) {
+    // Bar mode: transparent page + bottom bar only (for OBS overlay)
+    document.getElementById('barMode').classList.remove('hidden');
+    document.body.style.background = 'transparent';
+    document.documentElement.style.background = 'transparent';
+    document.title = '📊 شريط التبرعات';
+  } else {
+    document.getElementById('broadcast').classList.remove('hidden');
+    document.title = '💝 لجنة التبرعات المباشرة';
+  }
+
   if (!db) initFirebase();
 
   // قواعد Firestore تتطلب auth != null
@@ -2460,6 +2645,13 @@ function enterBroadcast() {
 }
 
 function showBcError() {
+  if (isBarMode()) {
+    const barTotal = document.getElementById('barTotal');
+    if (barTotal) barTotal.textContent = '— —';
+    const barTicker = document.getElementById('barTicker');
+    if (barTicker) barTicker.innerHTML = '<span class="bar-ticker-item" style="color:#fca5a5">⚠️ فعِّل Anonymous في Firebase Authentication</span>';
+    return;
+  }
   const totalEl = document.getElementById('bcTotal');
   if (totalEl) totalEl.textContent = '— —';
   const grid = document.getElementById('bcPatientsGrid');
@@ -2532,6 +2724,39 @@ function renderBroadcast() {
     if (d.phone && d.phone.trim()) donorKeys.add('p:' + d.phone.trim());
     else donorKeys.add('n:' + (d.name || 'anon') + ':' + d.id);
   });
+
+  // ===== BAR MODE: update bar elements and stop =====
+  if (isBarMode()) {
+    bcSetIfChanged('barTotal', bcFmt(total) + ' $', total !== bcLastTotal);
+    bcSetIfChanged('barDonors', bcFmt(donorKeys.size), donorKeys.size !== bcLastDonors);
+    bcLastTotal = total;
+    bcLastDonors = donorKeys.size;
+
+    // Bar ticker
+    const barTicker = document.getElementById('barTicker');
+    if (barTicker) {
+      const recent = [...confirmedDonations]
+        .sort((a, b) => {
+          const ta = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
+          const tb = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
+          return tb - ta;
+        })
+        .slice(0, 15);
+      if (recent.length) {
+        const items = recent.map(d => `
+          <span class="bar-ticker-item">
+            <span>${bcEscape(d.name || 'فاعل خير')}</span>
+            <span class="dot">•</span>
+            <span class="amt">${bcFmt(d.amount)} $</span>
+          </span>
+        `).join('');
+        barTicker.innerHTML = items + items;
+      } else {
+        barTicker.innerHTML = '<span class="bar-ticker-item" style="color:#64748b">بانتظار أول تبرع مؤكد...</span>';
+      }
+    }
+    return; // Bar mode doesn't need the full board rendering below
+  }
 
   const activePatients = bcPatients.filter(p => (p.status || 'active') === 'active');
   const totalTargets = activePatients.filter(p => p.targetAmount > 0).reduce((s, p) => s + p.targetAmount, 0);
@@ -2645,9 +2870,11 @@ function bcEscape(s) {
     .replace(/'/g, '&#39;');
 }
 
-// Auto-enter broadcast mode if URL hash matches
+// Auto-enter broadcast/bar mode if URL hash matches
 window.addEventListener('hashchange', () => {
-  if (isBroadcastMode() && document.getElementById('broadcast').classList.contains('hidden')) {
+  const bcHidden = document.getElementById('broadcast').classList.contains('hidden');
+  const barHidden = document.getElementById('barMode').classList.contains('hidden');
+  if ((isBroadcastMode() && bcHidden && barHidden) || (isBarMode() && barHidden && bcHidden)) {
     location.reload();
   }
 });
@@ -5092,7 +5319,7 @@ setupExpenseImageListener();
 /* ============================================================
    وضع البث المباشر - تفعيل تلقائي لو الرابط فيه #board
    ============================================================ */
-if (isBroadcastMode()) {
+if (isBroadcastMode() || isBarMode()) {
   enterBroadcast();
 } else {
   /* ============================================================
