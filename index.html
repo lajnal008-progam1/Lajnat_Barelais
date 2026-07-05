@@ -2192,6 +2192,7 @@ body.is-admin .admin-only { display: flex; }
       <div class="admin-card"><div class="num" id="admDonors">0</div><div class="lbl">عدد المتبرعين</div></div>
       <div class="admin-card"><div class="num" id="admPatients">0</div><div class="lbl">إجمالي المرضى</div></div>
       <div class="admin-card"><div class="num" id="admToday">0</div><div class="lbl">تبرعات اليوم</div></div>
+      <div class="admin-card" style="background:linear-gradient(135deg,#f0fdfa,#ccfbf1);border:1px solid #5eead4"><div class="num" id="admSurplus" style="color:#0f766e">0</div><div class="lbl">💰 فائض عام $</div></div>
     </div>
 
     <h2 style="margin-top:18px">📁 سجل المسؤولين</h2>
@@ -3165,57 +3166,141 @@ function patientStats(patientId) {
 }
 
 /* ============================================================
-   حساب توزيع التبرع على المرضى
-   - تبرع مخصص لمرضى محددين → تقسيم بالتساوي
-   - تبرع عام → تقسيم بالنسبة على أهداف المرضى النشطين
-   ============================================================ */
-function computeAllocations(amount, isAssigned, selectedIds) {
-  amount = Number(amount) || 0;
-  if (amount <= 0) return { allocations: [], mode: 'none' };
+   حساب توزيع التبرع على المرضى (مع توزيع الفائض المتسلسل)
 
-  // Assigned - equal split
-  if (isAssigned && Array.isArray(selectedIds) && selectedIds.length > 0) {
-    const share = amount / selectedIds.length;
+   القواعد:
+   1. مخصص لمرضى → تقسيم بالتساوي، لكن الحالة المكتملة تأخذ
+      فقط ما يُكمل هدفها، والفائض ينتقل للحالات غير المكتملة
+   2. عام → توزيع بالنسبة على "العجز المتبقي" لكل حالة نشطة
+      (وليس على الهدف الكامل) — الحالات المكتملة لا تأخذ شيئاً
+   3. لو كل الحالات مكتملة → الفائض يبقى رصيداً عاماً (surplus)
+   ============================================================ */
+function patientRemaining(p) {
+  // العجز المتبقي للمريض = الهدف - المجموع (لا يقل عن صفر)
+  const stats = patientStats(p.id);
+  const target = p.targetAmount || 0;
+  if (target <= 0) return 0;
+  return Math.max(0, target - stats.totalIn);
+}
+
+function round2(n) { return Math.round(n * 100) / 100; }
+
+/* توزيع مبلغ على قائمة مرضى بنسبة عجز كل واحد
+   يرجع { allocations, leftover } */
+function distributeByDeficit(amount, candidates) {
+  // candidates: [{patientId, remaining}] remaining > 0
+  const totalDeficit = candidates.reduce((s, c) => s + c.remaining, 0);
+  if (totalDeficit <= 0 || amount <= 0) {
+    return { allocations: [], leftover: amount };
+  }
+
+  if (amount >= totalDeficit) {
+    // المبلغ يغطي كل العجوزات - كل واحد ياخذ عجزه بالكامل والباقي فائض
     return {
-      allocations: selectedIds.map(pid => ({ patientId: pid, amount: share, source: 'assigned' })),
-      mode: 'assigned'
+      allocations: candidates.map(c => ({ patientId: c.patientId, amount: round2(c.remaining) })),
+      leftover: round2(amount - totalDeficit)
     };
   }
 
-  // General - proportional split based on targets
-  const activeWithTargets = patients.filter(p =>
-    (p.status || 'active') === 'active' && (p.targetAmount || 0) > 0
-  );
+  // المبلغ أقل من مجموع العجوزات - توزيع نسبي على العجز
+  const allocations = candidates.map(c => ({
+    patientId: c.patientId,
+    amount: (c.remaining / totalDeficit) * amount
+  }));
+  // تصحيح التقريب على آخر عنصر
+  const sumButLast = allocations.slice(0, -1).reduce((s, a) => s + round2(a.amount), 0);
+  allocations.forEach((a, i) => {
+    a.amount = (i < allocations.length - 1) ? round2(a.amount) : round2(amount - sumButLast);
+  });
+  return { allocations, leftover: 0 };
+}
 
-  if (activeWithTargets.length === 0) {
-    // No targets available → keep as pure general (no allocations)
-    return { allocations: [], mode: 'general-no-targets' };
+function computeAllocations(amount, isAssigned, selectedIds) {
+  amount = Number(amount) || 0;
+  if (amount <= 0) return { allocations: [], mode: 'none', surplus: 0 };
+
+  const activePatients = patients.filter(p => (p.status || 'active') === 'active');
+
+  // ═══ الوضع المخصص ═══
+  if (isAssigned && Array.isArray(selectedIds) && selectedIds.length > 0) {
+    const selected = selectedIds
+      .map(id => activePatients.find(p => p.id === id) || patients.find(p => p.id === id))
+      .filter(Boolean);
+
+    // الحالة الخاصة: مريض واحد بلا هدف أو مرضى بلا أهداف → تقسيم عادي بلا cascade
+    const anyTargets = selected.some(p => (p.targetAmount || 0) > 0);
+    if (!anyTargets) {
+      const share = amount / selected.length;
+      return {
+        allocations: selected.map(p => ({ patientId: p.id, amount: round2(share), source: 'assigned' })),
+        mode: 'assigned',
+        surplus: 0
+      };
+    }
+
+    // 1) الحصة المبدئية بالتساوي
+    const share = amount / selected.length;
+    let finalAllocs = {};
+    let overflow = 0;
+
+    selected.forEach(p => {
+      const remaining = (p.targetAmount || 0) > 0 ? patientRemaining(p) : Infinity;
+      const take = Math.min(share, remaining);
+      finalAllocs[p.id] = (finalAllocs[p.id] || 0) + take;
+      overflow += (share - take);
+    });
+
+    // 2) الفائض ينتقل للحالات النشطة غير المكتملة (بنسبة عجزها المتبقي بعد الخطوة 1)
+    if (overflow > 0.005) {
+      const others = activePatients
+        .map(p => {
+          const alreadyGiven = finalAllocs[p.id] || 0;
+          const rem = (p.targetAmount || 0) > 0
+            ? Math.max(0, patientRemaining(p) - alreadyGiven)
+            : 0;
+          return { patientId: p.id, remaining: rem };
+        })
+        .filter(c => c.remaining > 0.005);
+
+      const { allocations: overflowAllocs, leftover } = distributeByDeficit(overflow, others);
+      overflowAllocs.forEach(a => {
+        finalAllocs[a.patientId] = (finalAllocs[a.patientId] || 0) + a.amount;
+      });
+      overflow = leftover;
+    }
+
+    const allocations = Object.entries(finalAllocs)
+      .filter(([, amt]) => amt > 0.005)
+      .map(([pid, amt]) => ({
+        patientId: pid,
+        amount: round2(amt),
+        source: selectedIds.includes(pid) ? 'assigned' : 'overflow'
+      }));
+
+    return { allocations, mode: 'assigned', surplus: round2(overflow) };
   }
 
-  const totalTargets = activeWithTargets.reduce((s, p) => s + (p.targetAmount || 0), 0);
-  if (totalTargets <= 0) return { allocations: [], mode: 'general-no-targets' };
+  // ═══ الوضع العام ═══
+  // التوزيع بنسبة العجز المتبقي (الحالات المكتملة لا تدخل)
+  const candidates = activePatients
+    .map(p => ({ patientId: p.id, remaining: patientRemaining(p) }))
+    .filter(c => c.remaining > 0.005);
 
-  // Compute proportional shares (rounded to 2 decimals for display consistency)
-  const rawShares = activeWithTargets.map(p => ({
-    patientId: p.id,
-    ratio: (p.targetAmount || 0) / totalTargets,
-    amount: ((p.targetAmount || 0) / totalTargets) * amount,
-    source: 'general-proportional'
-  }));
+  if (candidates.length === 0) {
+    // لا حالات ناقصة → المبلغ فائض عام
+    const anyWithTargets = activePatients.some(p => (p.targetAmount || 0) > 0);
+    return {
+      allocations: [],
+      mode: anyWithTargets ? 'general-all-complete' : 'general-no-targets',
+      surplus: round2(amount)
+    };
+  }
 
-  // Ensure sum matches exactly (adjust last one for rounding)
-  const sumSoFar = rawShares.slice(0, -1).reduce((s, r) => s + Math.round(r.amount * 100) / 100, 0);
-  rawShares.forEach((r, i) => {
-    if (i < rawShares.length - 1) {
-      r.amount = Math.round(r.amount * 100) / 100;
-    } else {
-      r.amount = Math.round((amount - sumSoFar) * 100) / 100;
-    }
-  });
-
+  const { allocations, leftover } = distributeByDeficit(amount, candidates);
   return {
-    allocations: rawShares.map(r => ({ patientId: r.patientId, amount: r.amount, source: r.source })),
-    mode: 'general-proportional'
+    allocations: allocations.map(a => ({ ...a, source: 'general-proportional' })),
+    mode: 'general-proportional',
+    surplus: round2(leftover)
   };
 }
 
@@ -3251,7 +3336,7 @@ function addDonation() {
   if (assignMode && selectedPatientIds.length === 0) { alert('اختر مريضاً واحداً على الأقل أو اختر "تبرع عام"'); return; }
 
   // Compute allocations
-  const { allocations, mode } = computeAllocations(amount, assignMode, selectedPatientIds);
+  const { allocations, mode, surplus } = computeAllocations(amount, assignMode, selectedPatientIds);
   const patientIds = allocations.map(a => a.patientId);
   if (assignMode) patientsCount = selectedPatientIds.length;
   else if (allocations.length > 0) patientsCount = allocations.length;
@@ -3301,6 +3386,7 @@ function addDonation() {
     patientIds,
     patientAllocations: allocations,
     allocationMode: mode,
+    surplus: surplus || 0,
     notes,
     status: statusChoice,
     anonymous,
@@ -3337,6 +3423,7 @@ function renderAll() {
   renderFeed();
   renderFiles();
   renderAdmin();
+  renderPatients();
 }
 
 function renderStats() {
@@ -3699,6 +3786,9 @@ function renderAdmin() {
   document.getElementById('admDonors').textContent = uniqueKeys.size;
   document.getElementById('admPatients').textContent = patients;
   document.getElementById('admToday').textContent = todayCount;
+  const totalSurplus = donations.filter(d => d.status !== 'cancelled').reduce((s, d) => s + (d.surplus || 0), 0);
+  const surplusEl = document.getElementById('admSurplus');
+  if (surplusEl) surplusEl.textContent = fmt(totalSurplus);
 
   // Unallocated donations alert (admin only)
   renderUnallocatedAlert();
@@ -4146,10 +4236,21 @@ function updateSplitPreview() {
   const genPreview = document.getElementById('generalSplitPreview');
   const amount = parseFloat(document.getElementById('inpAmount').value) || 0;
 
-  // Assigned mode preview
+  // ═══ Assigned mode preview (with cascade) ═══
   if (assignMode && selectedPatientIds.length > 0 && amount > 0) {
-    const share = amount / selectedPatientIds.length;
-    preview.textContent = `💡 ${fmt(share)} $ لكل مريض × ${selectedPatientIds.length} = ${fmt(amount)} $`;
+    const { allocations, surplus } = computeAllocations(amount, true, selectedPatientIds);
+    const hasOverflow = allocations.some(a => a.source === 'overflow') || (surplus > 0);
+    if (hasOverflow) {
+      const parts = allocations.map(a => {
+        const p = patients.find(x => x.id === a.patientId);
+        const tag = a.source === 'overflow' ? ' ↪' : '';
+        return `${p ? p.name : '?'}: ${fmt(a.amount)}$${tag}`;
+      }).join(' • ');
+      preview.innerHTML = `💡 ${parts}${surplus > 0 ? ` • <span style="color:#d97706">فائض عام: ${fmt(surplus)}$</span>` : ''}<br><span style="font-size:11px;color:#0f766e">↪ = فائض انتقل تلقائياً لحالة غير مكتملة</span>`;
+    } else {
+      const share = amount / selectedPatientIds.length;
+      preview.textContent = `💡 ${fmt(share)} $ لكل مريض × ${selectedPatientIds.length} = ${fmt(amount)} $`;
+    }
   } else {
     preview.textContent = '';
   }
@@ -4159,29 +4260,35 @@ function updateSplitPreview() {
     document.getElementById('inpPatients').value = selectedPatientIds.length;
   }
 
-  // General mode preview (proportional split)
+  // ═══ General mode preview (deficit-proportional + surplus) ═══
   if (genPreview) {
     if (!assignMode && amount > 0) {
-      const { allocations, mode } = computeAllocations(amount, false, []);
+      const { allocations, mode, surplus } = computeAllocations(amount, false, []);
       if (mode === 'general-proportional' && allocations.length > 0) {
-        const totalTargets = patients
-          .filter(p => (p.status || 'active') === 'active' && (p.targetAmount || 0) > 0)
-          .reduce((s, p) => s + p.targetAmount, 0);
+        const totalDeficit = allocations.reduce((s, a) => {
+          const p = patients.find(x => x.id === a.patientId);
+          return s + (p ? patientRemaining(p) : 0);
+        }, 0);
         const rows = allocations.map(a => {
           const p = patients.find(x => x.id === a.patientId);
           if (!p) return '';
-          const pct = (p.targetAmount / totalTargets) * 100;
+          const rem = patientRemaining(p);
+          const pct = totalDeficit > 0 ? (rem / totalDeficit) * 100 : 0;
           return `<div class="split-row">
-            <span class="split-name">${escapeHtml(p.name)}</span>
+            <span class="split-name">${escapeHtml(p.name)} <small style="color:#78716c">(ناقصه ${fmt(rem)}$)</small></span>
             <span class="split-pct">${pct.toFixed(2)}%</span>
             <span class="split-amount">${fmt(a.amount)} $</span>
           </div>`;
         }).join('');
         genPreview.innerHTML = `
-          <div class="split-title">🧮 التوزيع التلقائي بالنسبة (على أهداف المرضى النشطين):</div>
+          <div class="split-title">🧮 التوزيع بنسبة العجز المتبقي (الحالات المكتملة لا تأخذ):</div>
           ${rows}
+          ${surplus > 0 ? `<div class="split-row" style="background:#fef3c7;border-radius:6px;padding:6px 8px"><span class="split-name">💰 فائض عام (كل الحالات اكتملت)</span><span></span><span class="split-amount" style="color:#d97706">${fmt(surplus)} $</span></div>` : ''}
           <div class="split-total">إجمالي: ${fmt(amount)} $</div>
         `;
+        genPreview.style.display = 'block';
+      } else if (mode === 'general-all-complete') {
+        genPreview.innerHTML = `<div class="split-note" style="color:#d97706;font-weight:bold">🎉 كل الحالات النشطة حققت أهدافها!<br>هذا التبرع (${fmt(amount)}$) سيُسجَّل كفائض عام للحملات القادمة.</div>`;
         genPreview.style.display = 'block';
       } else if (mode === 'general-no-targets') {
         genPreview.innerHTML = '<div class="split-note">ℹ️ لا يوجد مرضى نشطين لديهم مبلغ مطلوب محدد — التبرع يُسجّل كتبرع عام غير مخصص.</div>';
@@ -4368,10 +4475,17 @@ function renderPatientDetail(id) {
     <h3 style="margin:14px 0 8px;font-size:14px;color:#2c5364">📜 سجل الحركات (${movements.length})</h3>
     ${movements.length === 0 ? '<div class="empty">لا توجد حركات بعد</div>' : movements.map(m => {
       if (m.kind === 'in') {
-        const sourceLabel = m.allocSource === 'general-proportional' 
-          ? '🧮 من تبرع عام (توزيع بالنسبة)' 
-          : '🎯 مخصص لهذا المريض';
-        const sourceColor = m.allocSource === 'general-proportional' ? '#0f766e' : '#7c3aed';
+        let sourceLabel, sourceColor;
+        if (m.allocSource === 'general-proportional') {
+          sourceLabel = '🧮 من تبرع عام (توزيع بالنسبة)';
+          sourceColor = '#0f766e';
+        } else if (m.allocSource === 'overflow') {
+          sourceLabel = '↪ فائض من حالة اكتملت';
+          sourceColor = '#d97706';
+        } else {
+          sourceLabel = '🎯 مخصص لهذا المريض';
+          sourceColor = '#7c3aed';
+        }
         return `
           <div class="expense-card donation-in">
             <div class="expense-head">
